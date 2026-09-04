@@ -10,7 +10,8 @@ import type {
   SyncProgress,
   SyncResult
 } from '@shared/types'
-import { ENCHANTABLE_SLOTS, SLOT_LABELS } from '@shared/constants'
+import { ENCHANTABLE_SLOTS } from '@shared/constants'
+import { t } from './i18n'
 import { apiGet, getAccountProfile, localized, type AccountCharacter } from './blizzard'
 import { store } from './store'
 
@@ -136,7 +137,7 @@ export function isSyncing(): boolean {
  */
 export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
   if (syncing) {
-    return { ok: false, characterCount: 0, failed: [], error: 'Synchronisation déjà en cours.' }
+    return { ok: false, characterCount: 0, failed: [], error: t('err.syncRunning') }
   }
   syncing = true
 
@@ -145,7 +146,7 @@ export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
   }
 
   try {
-    emit({ phase: 'account', current: 0, total: 0, label: 'Lecture du compte Battle.net…' })
+    emit({ phase: 'account', current: 0, total: 0, label: t('sync.account') })
 
     const settings = store.getSettings()
     const profile = await getAccountProfile()
@@ -153,7 +154,7 @@ export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
 
     const accounts = profile.wow_accounts ?? []
     accounts.forEach((account, index) => {
-      const label = accounts.length > 1 ? `Compte ${index + 1}` : 'Compte principal'
+      const label = accounts.length > 1 ? `#${index + 1}` : ''
       for (const char of account.characters ?? []) {
         if (char.level >= settings.minLevel) refs.push({ char, accountLabel: label })
       }
@@ -162,8 +163,8 @@ export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
     if (!refs.length) {
       const message =
         accounts.length === 0
-          ? "Aucun compte WoW retourné par Battle.net. Vérifie que le compte autorisé possède bien une licence WoW."
-          : `Aucun personnage au-dessus du niveau ${settings.minLevel}.`
+          ? t('err.noAccounts')
+          : t('err.noCharacters', { level: settings.minLevel })
       emit({ phase: 'error', current: 0, total: 0, label: message, error: message })
       return { ok: false, characterCount: 0, failed: [], error: message }
     }
@@ -204,7 +205,7 @@ export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
     })
 
     const count = refs.length - failed.length
-    emit({ phase: 'done', current: done, total: refs.length, label: `${count} personnages` })
+    emit({ phase: 'done', current: done, total: refs.length, label: t('common.characters', { count }) })
     return { ok: true, characterCount: count, failed }
   } catch (err) {
     const message = (err as Error).message
@@ -218,7 +219,7 @@ export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
 /** Resynchronise un seul personnage déjà connu. */
 export async function syncOne(id: string): Promise<CharacterDetail | null> {
   const existing = store.getData().characters[id]
-  if (!existing) throw new Error('Personnage inconnu, lance une synchronisation complète.')
+  if (!existing) throw new Error(t('err.unknownCharacter'))
 
   const fake: AccountCharacter = {
     name: existing.name,
@@ -251,16 +252,16 @@ async function fetchCharacter(
 
   // Le résumé est obligatoire : sans lui, le perso n'est pas exploitable.
   const summary = await apiGet<SummaryResponse>(base)
-  if (!summary) throw new Error('Profil indisponible (perso jamais connecté depuis la mise à jour ?)')
+  if (!summary) throw new Error(t('err.profileUnavailable'))
 
   // Le reste est optionnel et tolérant aux 404 (pas de M+, pas de métier...).
   const [equipment, statistics, mythic, raids, professions, media] = await Promise.all([
-    safe(() => apiGet<EquipmentResponse>(`${base}/equipment`, { optional: true }), warnings, 'équipement'),
-    safe(() => apiGet<StatisticsResponse>(`${base}/statistics`, { optional: true }), warnings, 'statistiques'),
-    safe(() => apiGet<MythicResponse>(`${base}/mythic-keystone-profile`, { optional: true }), warnings, 'mythique+'),
+    safe(() => apiGet<EquipmentResponse>(`${base}/equipment`, { optional: true }), warnings, 'equipment'),
+    safe(() => apiGet<StatisticsResponse>(`${base}/statistics`, { optional: true }), warnings, 'statistics'),
+    safe(() => apiGet<MythicResponse>(`${base}/mythic-keystone-profile`, { optional: true }), warnings, 'mythicplus'),
     safe(() => apiGet<RaidsResponse>(`${base}/encounters/raids`, { optional: true }), warnings, 'raids'),
-    safe(() => apiGet<ProfessionsResponse>(`${base}/professions`, { optional: true }), warnings, 'métiers'),
-    safe(() => apiGet<MediaResponse>(`${base}/character-media`, { optional: true }), warnings, 'portrait')
+    safe(() => apiGet<ProfessionsResponse>(`${base}/professions`, { optional: true }), warnings, 'professions'),
+    safe(() => apiGet<MediaResponse>(`${base}/character-media`, { optional: true }), warnings, 'media')
   ])
 
   const gear = parseGear(equipment)
@@ -325,7 +326,6 @@ function parseGear(equipment: EquipmentResponse | null): GearItem[] {
 
     return {
       slot,
-      slotLabel: SLOT_LABELS[slot] ?? localized(item.slot.name) ?? slot,
       itemId: item.item.id,
       name: localized(item.name),
       itemLevel: item.level?.value ?? 0,
@@ -342,10 +342,12 @@ function parseGear(equipment: EquipmentResponse | null): GearItem[] {
 function parseStats(stats: StatisticsResponse | null): CharacterStats | null {
   if (!stats) return null
 
+  // On memorise la cle de traduction, pas le libelle : la langue peut changer
+  // sans qu'on resynchronise le personnage.
   const candidates: { name: string; value: number }[] = [
-    { name: 'Force', value: stats.strength?.effective ?? 0 },
-    { name: 'Agilité', value: stats.agility?.effective ?? 0 },
-    { name: 'Intelligence', value: stats.intellect?.effective ?? 0 }
+    { name: 'strength', value: stats.strength?.effective ?? 0 },
+    { name: 'agility', value: stats.agility?.effective ?? 0 },
+    { name: 'intellect', value: stats.intellect?.effective ?? 0 }
   ]
   const primary = candidates.reduce((best, c) => (c.value > best.value ? c : best))
 

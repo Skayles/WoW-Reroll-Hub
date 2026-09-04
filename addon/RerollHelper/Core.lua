@@ -10,7 +10,7 @@
 local ADDON_NAME, RH = ...
 _G.RerollHelper = RH
 
-RH.SCHEMA = 1
+RH.SCHEMA = 2
 RH.VERSION = C_AddOns and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "0.1.0"
 
 -- ---------------------------------------------------------------------------
@@ -28,20 +28,19 @@ end
 
 --- Message d'état affiché quand les données sont absentes ou périmées.
 function RH:GetDataStatus()
+	local L = self.L
 	local data = self:GetExport()
 	if not data then
-		return "missing", "Aucune donnée exportée. Ouvre WoW Reroll Hub, synchronise ton compte puis clique sur « Exporter maintenant »."
+		return "missing", L.noData
 	end
 
 	if (data.schema or 0) ~= self.SCHEMA then
-		return "schema",
-			("Format de données incompatible (fichier v%d, addon v%d). Mets à jour l'application et l'addon ensemble.")
-				:format(data.schema or 0, self.SCHEMA)
+		return "schema", L.badSchema:format(data.schema or 0, self.SCHEMA)
 	end
 
 	local age = time() - (data.generatedAt or 0)
 	if age > 7 * 24 * 3600 then
-		return "stale", ("Données vieilles de %d jours — pense à resynchroniser."):format(math.floor(age / 86400))
+		return "stale", L.stale:format(math.floor(age / 86400))
 	end
 
 	return "ok", nil
@@ -80,10 +79,11 @@ function RH:IlvlColor(ilvl, best)
 	return 0.85, 0.42, 0.42 -- rouge : gros retard
 end
 
-local ROLE_LABELS = { TANK = "Tank", HEALER = "Soigneur", DAMAGE = "DPS" }
-
 function RH:RoleLabel(role)
-	return ROLE_LABELS[role or ""] or ""
+	if not role or role == "" then
+		return ""
+	end
+	return self.L["role" .. role]
 end
 
 function RH:FormatPercent(value)
@@ -95,7 +95,7 @@ end
 
 function RH:FormatDate(timestamp)
 	if not timestamp or timestamp == 0 then
-		return "jamais"
+		return self.L.never
 	end
 	return date("%d/%m/%Y %H:%M", timestamp)
 end
@@ -196,17 +196,18 @@ loader:SetScript("OnEvent", function(_, _, loadedAddon)
 	ApplyDefaults(RerollHelperDB, DEFAULTS)
 	RH.db = RerollHelperDB
 
+	-- La locale se charge avant toute lecture des donnees : GetDataStatus et
+	-- les libelles en dependent.
+	RH:LoadLocale()
+
 	local status, message = RH:GetDataStatus()
 	local data = RH:GetExport()
 	local count = data and #data.characters or 0
 
 	if status == "ok" then
-		print(("|cff5ac8faReroll Helper|r : %d personnages chargés (export du %s). Tape /rh."):format(
-			count,
-			RH:FormatDate(data.generatedAt)
-		))
+		print("|cff5ac8fa" .. RH.L.title .. "|r : " .. RH.L.loaded:format(count, RH:FormatDate(data.generatedAt)))
 	else
-		print("|cff5ac8faReroll Helper|r : " .. (message or "données indisponibles."))
+		print("|cff5ac8fa" .. RH.L.title .. "|r : " .. (message or ""))
 	end
 
 	loader:UnregisterEvent("ADDON_LOADED")
@@ -226,7 +227,7 @@ SlashCmdList["REROLLHELPER"] = function(input)
 	if command == "status" then
 		local _, message = RH:GetDataStatus()
 		local data = RH:GetExport()
-		print(("|cff5ac8faReroll Helper|r v%s — %d personnages, export du %s."):format(
+		print("|cff5ac8fa" .. RH.L.title .. "|r " .. RH.L.statusLine:format(
 			RH.VERSION,
 			data and #data.characters or 0,
 			RH:FormatDate(data and data.generatedAt)
@@ -238,9 +239,9 @@ SlashCmdList["REROLLHELPER"] = function(input)
 	end
 
 	if command == "help" then
-		print("|cff5ac8faReroll Helper|r — commandes :")
-		print("  /rh          ouvre ou ferme la fenêtre")
-		print("  /rh status   état des données exportées")
+		print("|cff5ac8fa" .. RH.L.title .. "|r — " .. RH.L.helpHeader)
+		print(RH.L.helpToggle)
+		print(RH.L.helpStatus)
 		return
 	end
 

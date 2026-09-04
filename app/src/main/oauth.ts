@@ -2,6 +2,7 @@ import { shell } from 'electron'
 import http from 'node:http'
 import crypto from 'node:crypto'
 import { store } from './store'
+import { t } from './i18n'
 
 const AUTHORIZE_URL = 'https://oauth.battle.net/authorize'
 const TOKEN_URL = 'https://oauth.battle.net/token'
@@ -33,8 +34,8 @@ export function clearToken(): void {
   store.clearToken()
 }
 
-function html(title: string, message: string, accent: string): string {
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+function html(title: string, message: string, accent: string, lang: string): string {
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">
 <title>${title}</title><style>
 body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
 background:#12151c;color:#e6e8ee;font:16px/1.6 system-ui,Segoe UI,sans-serif}
@@ -54,12 +55,11 @@ h1{margin:0 0 8px;font-size:19px;color:${accent}}p{margin:0;color:#9aa4b2}
 export async function authorize(): Promise<StoredToken> {
   const settings = store.getSettings()
   if (!settings.clientId || !settings.clientSecret) {
-    throw new Error(
-      "Client ID et Client Secret Battle.net requis. Renseigne-les dans Réglages (créés sur https://develop.battle.net/access/clients)."
-    )
+    throw new Error(t('err.credentialsMissing'))
   }
 
   const port = settings.oauthPort
+  const lang = settings.language
   const state = crypto.randomBytes(16).toString('hex')
   const uri = redirectUri(port)
 
@@ -77,23 +77,17 @@ export async function authorize(): Promise<StoredToken> {
 
       const fail = (msg: string): void => {
         res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' })
-        res.end(html('Connexion échouée', msg, '#ff6b6b'))
+        res.end(html(t('oauth.page.failed'), msg, '#ff6b6b', lang))
         server.close()
         reject(new Error(msg))
       }
 
-      if (error) return fail(`Battle.net a refusé l'autorisation : ${error}`)
-      if (returnedState !== state) return fail('State OAuth invalide, tentative rejetée.')
-      if (!returnedCode) return fail('Aucun code renvoyé par Battle.net.')
+      if (error) return fail(t('err.oauthDenied', { error }))
+      if (returnedState !== state) return fail(t('err.oauthState'))
+      if (!returnedCode) return fail(t('err.oauthNoCode'))
 
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      res.end(
-        html(
-          'Connecté !',
-          'Tu peux fermer cet onglet et revenir sur WoW Reroll Hub.',
-          '#5ac8fa'
-        )
-      )
+      res.end(html(t('oauth.page.ok'), t('oauth.page.okBody'), '#5ac8fa', lang))
       server.close()
       resolve(returnedCode)
     })
@@ -101,9 +95,7 @@ export async function authorize(): Promise<StoredToken> {
     server.on('error', (err: NodeJS.ErrnoException) => {
       reject(
         err.code === 'EADDRINUSE'
-          ? new Error(
-              `Le port ${port} est déjà utilisé. Change le port de redirection dans Réglages (et sur develop.battle.net).`
-            )
+          ? new Error(t('err.portInUse', { port }))
           : err
       )
     })
@@ -123,7 +115,7 @@ export async function authorize(): Promise<StoredToken> {
     setTimeout(() => {
       if (server.listening) {
         server.close()
-        reject(new Error("Délai dépassé : aucune autorisation reçue en 5 minutes."))
+        reject(new Error(t('err.oauthTimeout')))
       }
     }, 5 * 60 * 1000)
   })
@@ -157,7 +149,7 @@ async function exchangeCode(
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(
-      `Échange du code refusé (${res.status}). Vérifie que "${uri}" est bien enregistré comme Redirect URI sur develop.battle.net. ${body.slice(0, 200)}`
+      t('err.tokenExchange', { status: res.status, uri, body: body.slice(0, 200) })
     )
   }
 

@@ -11,5 +11,6 @@
 # Données générées par l'application : ce fichier est écrasé à chaque export.
 Data\Export.lua
 
+Locale.lua
 Core.lua
 UI.lua

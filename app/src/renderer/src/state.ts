@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   AppData,
   AppSettings,
@@ -7,6 +7,7 @@ import type {
   SyncProgress,
   SyncResult
 } from '@shared/types'
+import { translator, type Translate } from '@shared/i18n'
 
 const EMPTY_DATA: AppData = {
   characters: {},
@@ -18,6 +19,8 @@ const EMPTY_DATA: AppData = {
 }
 
 export interface Hub {
+  /** Traducteur figé sur la langue courante des réglages. */
+  t: Translate
   data: AppData
   settings: AppSettings | null
   auth: AuthStatus
@@ -47,6 +50,15 @@ export function useHub(): Hub {
   const [banner, setBanner] = useState<Hub['banner']>(null)
   const [loading, setLoading] = useState(true)
 
+  // Le traducteur est mémoïsé sur la langue : changer de langue re-rend toute
+  // l'interface sans qu'aucun composant n'ait à s'abonner à autre chose.
+  const t = useMemo(() => translator(settings?.language ?? 'fr'), [settings?.language])
+
+  // Les écouteurs IPC sont posés une seule fois : ils lisent la langue via
+  // cette référence plutôt que de se réabonner à chaque changement de réglage.
+  const settingsRef = useRef<AppSettings | null>(null)
+  settingsRef.current = settings
+
   const reload = useCallback(async () => {
     const [nextData, nextSettings, nextAuth] = await Promise.all([
       window.api.data.get(),
@@ -63,10 +75,14 @@ export function useHub(): Hub {
 
     const offProgress = window.api.sync.onProgress(setProgress)
     const offExport = window.api.exporter.onAuto((result) => {
+      const translate = translator(settingsRef.current?.language ?? 'fr')
       setBanner(
         result.ok
-          ? { kind: 'ok', text: `Addon mis à jour (${result.characterCount} personnages).` }
-          : { kind: 'error', text: `Export automatique échoué : ${result.error}` }
+          ? {
+              kind: 'ok',
+              text: translate('export.auto.ok', { count: result.characterCount ?? 0 })
+            }
+          : { kind: 'error', text: translate('export.auto.failed', { error: result.error ?? '' }) }
       )
     })
 
@@ -99,34 +115,41 @@ export function useHub(): Hub {
   )
 
   const login = useCallback(async () => {
-    setBanner({ kind: 'ok', text: 'Autorisation ouverte dans le navigateur…' })
+    setBanner({ kind: 'ok', text: t('settings.opening') })
     const status = await run(() => window.api.auth.login())
-    if (status) setBanner({ kind: 'ok', text: `Connecté en tant que ${status.battletag ?? 'compte Battle.net'}.` })
-  }, [run])
+    if (status) {
+      setBanner({
+        kind: 'ok',
+        text: t('settings.loggedIn', { battletag: status.battletag ?? 'Battle.net' })
+      })
+    }
+  }, [run, t])
 
   const logout = useCallback(async () => {
-    await run(() => window.api.auth.logout(), 'Déconnecté.')
-  }, [run])
+    await run(() => window.api.auth.logout(), t('settings.loggedOut'))
+  }, [run, t])
 
   const syncAll = useCallback(async () => {
     setBanner(null)
     const result = await run<SyncResult>(() => window.api.sync.all())
     if (!result) return
     if (!result.ok) {
-      setBanner({ kind: 'error', text: result.error ?? 'Synchronisation échouée.' })
+      setBanner({ kind: 'error', text: result.error ?? t('sync.failed') })
       return
     }
     const failedNote = result.failed.length
-      ? ` ${result.failed.length} en échec : ${result.failed
-          .slice(0, 3)
-          .map((f) => f.name)
-          .join(', ')}${result.failed.length > 3 ? '…' : ''}`
+      ? t('sync.failedSome', {
+          count: result.failed.length,
+          names:
+            result.failed.slice(0, 3).map((f) => f.name).join(', ') +
+            (result.failed.length > 3 ? '…' : '')
+        })
       : ''
     setBanner({
       kind: result.failed.length ? 'error' : 'ok',
-      text: `${result.characterCount} personnages synchronisés.${failedNote}`
+      text: t('sync.done', { count: result.characterCount }) + failedNote
     })
-  }, [run])
+  }, [run, t])
 
   const characters = useMemo(() => {
     const pinned = new Set(data.pinned)
@@ -138,6 +161,7 @@ export function useHub(): Hub {
   }, [data])
 
   return {
+    t,
     data,
     settings,
     auth,

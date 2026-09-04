@@ -2,8 +2,10 @@ import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { DroptimizerReport, DroptimizerUpgrade } from '@shared/types'
+import { groupForInventoryType, type SlotGroup } from '@shared/slots'
 import { apiGet, localized } from './blizzard'
-import { SLOT_LABELS } from '@shared/constants'
+import { ensureIndex, lookup } from './journal'
+import { t } from './i18n'
 
 /**
  * Import d'un rapport Droptimizer Raidbots.
@@ -11,9 +13,10 @@ import { SLOT_LABELS } from '@shared/constants'
  * Raidbots ne documente pas publiquement le format de data.json et le nom des
  * profilesets a déjà changé plusieurs fois. Le parseur est donc volontairement
  * tolérant : il extrait les identifiants d'objet par heuristique, puis les
- * résout via l'API Blizzard (qui, elle, est stable) pour obtenir nom et slot.
- * Si un identifiant ne résout pas, l'objet est conservé avec son nom brut
- * plutôt que jeté.
+ * résout via l'API Blizzard (qui, elle, est stable) pour obtenir le nom, le
+ * type d'inventaire et — via le journal des aventures — le boss qui les fait
+ * tomber. Un identifiant non résolu conserve son nom brut plutôt que d'être
+ * jeté.
  */
 
 const REPORT_ID_RE = /^[A-Za-z0-9_-]{4,40}$/
@@ -57,12 +60,8 @@ export async function fetchReport(reportId: string): Promise<RawSim> {
     headers: { accept: 'application/json' },
     signal: AbortSignal.timeout(30_000)
   })
-  if (res.status === 404) {
-    throw new Error(
-      `Rapport ${reportId} introuvable. Les rapports Raidbots expirent (30 jours pour un compte gratuit) — relance le Droptimizer.`
-    )
-  }
-  if (!res.ok) throw new Error(`Raidbots a répondu ${res.status}.`)
+  if (res.status === 404) throw new Error(t('err.reportNotFound', { id: reportId }))
+  if (!res.ok) throw new Error(t('err.raidbots', { status: res.status }))
   return (await res.json()) as RawSim
 }
 
@@ -71,10 +70,10 @@ export function parseRawJson(text: string): RawSim {
   try {
     parsed = JSON.parse(text)
   } catch {
-    throw new Error("Le contenu collé n'est pas du JSON valide (attendu : le data.json du rapport).")
+    throw new Error(t('err.badJson'))
   }
   const sim = parsed as RawSim
-  if (!sim?.sim) throw new Error("JSON inattendu : la clé \"sim\" est absente.")
+  if (!sim?.sim) throw new Error(t('err.noSimKey'))
   return sim
 }
 
@@ -90,16 +89,10 @@ export async function buildReport(
     raw.sim?.players?.[0]?.collected_data?.dps?.mean ??
     raw.sim?.profilesets?.results?.reduce((min, r) => Math.min(min, r.mean ?? Infinity), Infinity)
 
-  if (!baselineDps || !Number.isFinite(baselineDps)) {
-    throw new Error("Impossible de déterminer le DPS de référence dans ce rapport.")
-  }
+  if (!baselineDps || !Number.isFinite(baselineDps)) throw new Error(t('err.noBaseline'))
 
   const results = raw.sim?.profilesets?.results ?? []
-  if (!results.length) {
-    throw new Error(
-      "Ce rapport ne contient aucun profileset : ce n'est probablement pas un Droptimizer (Top Gear et Quick Sim ne sont pas supportés)."
-    )
-  }
+  if (!results.length) throw new Error(t('err.notDroptimizer'))
 
   // Un même objet apparaît à plusieurs ilvl/difficultés : on ne garde que sa
   // meilleure occurrence, c'est elle qui décide s'il vaut le coup de farm.
@@ -115,27 +108,41 @@ export async function buildReport(
   }
 
   const unresolved = [...best.values()].filter((e) => e.itemId === null).length
-  if (unresolved) {
-    notes.push(`${unresolved} objet(s) sans identifiant reconnu, affichés avec leur nom brut.`)
+  if (unresolved) notes.push(t('note.unresolvedItems', { count: unresolved }))
+
+  // L'index du butin est construit ici plutôt qu'au démarrage : il ne sert
+  // qu'aux droptimizers, et sa construction coûte une centaine de requêtes.
+  try {
+    await ensureIndex()
+  } catch {
+    // Sans index, les objets restent affichés, simplement sans leur source.
   }
 
   const upgrades: DroptimizerUpgrade[] = []
+  let unknownSources = 0
+
   for (const entry of best.values()) {
     const gain = entry.dps - baselineDps
     const meta = entry.itemId !== null ? await resolveItem(entry.itemId) : null
+    const source = entry.itemId !== null ? lookup(entry.itemId) : null
+    if (!source) unknownSources++
+
     upgrades.push({
       itemId: entry.itemId ?? 0,
       itemName: meta?.name || prettifyRawName(entry.rawName),
-      slot: meta?.slot || sourceFromRawName(entry.rawName).slot,
-      source: sourceFromRawName(entry.rawName).source,
+      slotGroup: meta?.slotGroup ?? 'OTHER',
+      instance: source?.instance ?? null,
+      boss: source?.boss ?? null,
       dps: Math.round(entry.dps),
       gain: Math.round(gain),
       gainPct: (gain / baselineDps) * 100,
       wowheadUrl: entry.itemId
-        ? `https://www.wowhead.com/fr/item=${entry.itemId}`
-        : 'https://www.wowhead.com/fr'
+        ? `https://www.wowhead.com/item=${entry.itemId}`
+        : 'https://www.wowhead.com'
     })
   }
+
+  if (unknownSources) notes.push(t('note.unknownSources', { count: unknownSources }))
 
   upgrades.sort((a, b) => b.gainPct - a.gainPct)
 
@@ -177,17 +184,6 @@ function guessItemId(rawName: string): number | null {
   return Math.max(...candidates)
 }
 
-/** Récupère ce qui ressemble à une source/difficulté et un slot dans le nom brut. */
-function sourceFromRawName(rawName: string): { source: string; slot: string } {
-  const segments = rawName.split('/').filter(Boolean)
-  const words = segments.filter((s) => Number.isNaN(Number(s)))
-
-  const slotWord = words.find((w) => /^(head|neck|shoulder|back|chest|wrist|hands|waist|legs|feet|finger|trinket|main_hand|off_hand|weapon)/i.test(w))
-  const source = words.filter((w) => w !== slotWord).join(' ') || 'Inconnue'
-
-  return { source, slot: slotWord ? slotWord.replace(/_/g, ' ') : '' }
-}
-
 function prettifyRawName(rawName: string): string {
   const words = rawName.split('/').filter((s) => s && Number.isNaN(Number(s)))
   return words.join(' ') || rawName
@@ -199,7 +195,7 @@ function prettifyRawName(rawName: string): string {
 
 interface ItemMeta {
   name: string
-  slot: string
+  slotGroup: SlotGroup
 }
 
 let cache: Record<string, ItemMeta | null> | null = null
@@ -208,7 +204,9 @@ let cacheDirty = false
 
 function loadCache(): Record<string, ItemMeta | null> {
   if (cache) return cache
-  cachePath = path.join(app.getPath('userData'), 'item-cache.json')
+  // Suffixe de version : le cache v1 stockait un libellé de slot figé, devenu
+  // incompatible avec les groupes normalisés. Le renommer l'invalide proprement.
+  cachePath = path.join(app.getPath('userData'), 'item-cache-v2.json')
   try {
     cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'))
   } catch {
@@ -245,10 +243,7 @@ async function resolveItem(itemId: number): Promise<ItemMeta | null> {
     const meta: ItemMeta | null = item
       ? {
           name: localized(item.name),
-          slot:
-            SLOT_LABELS[item.inventory_type?.type ?? ''] ??
-            localized(item.inventory_type?.name) ??
-            ''
+          slotGroup: groupForInventoryType(item.inventory_type?.type)
         }
       : null
     store[key] = meta

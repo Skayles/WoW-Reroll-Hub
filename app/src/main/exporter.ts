@@ -7,10 +7,8 @@ import { ADDON_NAME } from '@shared/constants'
 import { computeFocus, findWeakSlots } from '@shared/focus'
 import { toLua } from './lua'
 import { store } from './store'
+import { t } from './i18n'
 import { addonsDir, isWowRoot } from './wowPath'
-
-/** Nombre d'améliorations retenues par perso : au-delà, le fichier gonfle pour rien. */
-const MAX_UPGRADES_PER_CHARACTER = 8
 
 /** Dossier source de l'addon, différent selon dev / application packagée. */
 function addonSourceDir(): string {
@@ -37,8 +35,11 @@ function buildPayload(): { lua: string; count: number } {
   const payload = {
     schema: EXPORT_SCHEMA_VERSION,
     generatedAt: Math.floor(Date.now() / 1000),
-    generatedAtText: new Date().toLocaleString('fr-FR'),
+    generatedAtText: new Date().toLocaleString(settings.language === 'en' ? 'en-GB' : 'fr-FR'),
     region: settings.region,
+    // L'addon suit la langue choisie dans l'application plutôt que celle du
+    // client WoW : c'est ce que l'utilisateur a explicitement demandé ici.
+    lang: settings.language,
     characters
   }
 
@@ -61,32 +62,6 @@ function serializeCharacter(
 ): Record<string, unknown> {
   const focus = computeFocus(character, reports)
 
-  // Meilleures améliorations tous contenus confondus, dédoublonnées par objet :
-  // un même item simulé dans deux rapports ne doit apparaître qu'une fois, avec
-  // le contenu où il rapporte le plus.
-  const byItem = new Map<number, { gainPct: number; itemName: string; slot: string; contentTag: string }>()
-  for (const report of reports) {
-    if (report.characterId !== character.id) continue
-    const tag = report.contentTag || report.contentLabel || 'Non classé'
-    for (const upgrade of report.upgrades) {
-      if (upgrade.gainPct <= 0) continue
-      const previous = byItem.get(upgrade.itemId)
-      if (!previous || upgrade.gainPct > previous.gainPct) {
-        byItem.set(upgrade.itemId, {
-          gainPct: upgrade.gainPct,
-          itemName: upgrade.itemName,
-          slot: upgrade.slot,
-          contentTag: tag
-        })
-      }
-    }
-  }
-
-  const upgrades = [...byItem.entries()]
-    .map(([itemId, entry]) => ({ itemId, ...entry }))
-    .sort((a, b) => b.gainPct - a.gainPct)
-    .slice(0, MAX_UPGRADES_PER_CHARACTER)
-
   return {
     id: character.id,
     name: character.name,
@@ -108,27 +83,43 @@ function serializeCharacter(
     focus: focus.recommended
       ? {
           content: focus.recommended.contentTag,
-          bestGainPct: Number(focus.recommended.bestGainPct.toFixed(2)),
-          top3AvgPct: Number(focus.recommended.top3AvgPct.toFixed(2)),
+          bestGainPct: round2(focus.recommended.bestGainPct),
+          top3AvgPct: round2(focus.recommended.top3AvgPct),
           upgradeCount: focus.recommended.upgradeCount
         }
       : null,
     contents: focus.entries.map((entry) => ({
       tag: entry.contentTag,
-      bestGainPct: Number(entry.bestGainPct.toFixed(2)),
-      top3AvgPct: Number(entry.top3AvgPct.toFixed(2)),
+      bestGainPct: round2(entry.bestGainPct),
+      top3AvgPct: round2(entry.top3AvgPct),
       upgradeCount: entry.upgradeCount
     })),
-    upgrades: upgrades.map((u) => ({
-      itemId: u.itemId,
-      name: u.itemName,
-      slot: u.slot,
-      content: u.contentTag,
-      gainPct: Number(u.gainPct.toFixed(2))
+    // Meilleure pièce par emplacement, avec le boss qui la fait tomber : c'est
+    // la vue la plus actionnable en jeu, on l'envoie telle quelle.
+    bySlot: focus.bySlot
+      .filter((slot) => slot.upgrades.length > 0)
+      .map((slot) => ({
+        slot: slot.slotGroup,
+        candidates: slot.candidateCount,
+        items: slot.upgrades.map((upgrade) => ({
+          itemId: upgrade.itemId,
+          name: upgrade.itemName,
+          gainPct: round2(upgrade.gainPct),
+          content: upgrade.contentTag,
+          instance: upgrade.instance ?? '',
+          boss: upgrade.boss ?? ''
+        }))
+      })),
+    // Problèmes décrits de façon structurée : l'addon les rend dans sa langue.
+    issues: focus.gearIssues.map((issue) => ({
+      type: issue.type,
+      slot: issue.slot ?? '',
+      count: issue.count ?? 0
     })),
-
-    issues: focus.gearIssues,
-    weakSlots: findWeakSlots(character),
+    weakSlots: findWeakSlots(character).map((weak) => ({
+      slot: weak.slot,
+      ilvl: weak.itemLevel
+    })),
     raids: character.raids.map((r) => ({
       raid: r.raid,
       difficulty: r.difficulty,
@@ -136,6 +127,10 @@ function serializeCharacter(
       total: r.total
     }))
   }
+}
+
+function round2(value: number): number {
+  return Number(value.toFixed(2))
 }
 
 // ---------------------------------------------------------------------------
@@ -159,12 +154,12 @@ function installAddonFiles(target: string): boolean {
 export function exportToAddon(): ExportResult {
   const settings = store.getSettings()
   if (!settings.wowPath) {
-    return { ok: false, error: "Aucun dossier WoW configuré. Va dans Réglages > Dossier WoW." }
+    return { ok: false, error: t('err.noWowPath') }
   }
   if (!isWowRoot(settings.wowPath)) {
     return {
       ok: false,
-      error: `"${settings.wowPath}" ne ressemble pas à une installation WoW (aucun dossier _retail_ / _classic_ trouvé).`
+      error: t('err.notWowRoot', { path: settings.wowPath })
     }
   }
 
@@ -172,7 +167,7 @@ export function exportToAddon(): ExportResult {
   if (!fs.existsSync(dir)) {
     return {
       ok: false,
-      error: `Dossier introuvable : ${dir}. Lance WoW au moins une fois avec cette saveur.`
+      error: t('err.addonsMissing', { path: dir })
     }
   }
 
@@ -191,7 +186,7 @@ export function exportToAddon(): ExportResult {
     return { ok: true, filePath, characterCount: count, addonInstalled }
   } catch (err) {
     const message = (err as NodeJS.ErrnoException).code === 'EPERM'
-      ? "Accès refusé au dossier AddOns. Ferme WoW ou lance l'application en administrateur."
+      ? t('err.addonsDenied')
       : (err as Error).message
     return { ok: false, error: message }
   }

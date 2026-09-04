@@ -12,6 +12,7 @@ interface Props {
 }
 
 export default function Roster({ hub, selectedId, onSelect }: Props): JSX.Element {
+  const { t } = hub
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('ilvl')
 
@@ -55,23 +56,25 @@ export default function Roster({ hub, selectedId, onSelect }: Props): JSX.Elemen
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="brand">
-          <strong>WoW Reroll Hub</strong>
-          <span className="faint">{total} perso{total > 1 ? 's' : ''}</span>
+          <strong>{t('app.name')}</strong>
+          <span className="faint">{t('roster.count', { count: total })}</span>
         </div>
         <input
-          placeholder="Rechercher un perso, un royaume…"
+          placeholder={t('roster.search')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <div className="sidebar-filters">
           <span className="faint" style={{ alignSelf: 'center' }}>
-            {hub.auth.connected ? hub.auth.battletag ?? 'Connecté' : 'Non connecté'}
+            {hub.auth.connected
+              ? hub.auth.battletag ?? t('roster.connected')
+              : t('roster.disconnected')}
           </span>
           <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-            <option value="ilvl">Trier par ilvl</option>
-            <option value="mplus">Trier par score M+</option>
-            <option value="level">Trier par niveau</option>
-            <option value="name">Trier par nom</option>
+            <option value="ilvl">{t('roster.sort.ilvl')}</option>
+            <option value="mplus">{t('roster.sort.mplus')}</option>
+            <option value="level">{t('roster.sort.level')}</option>
+            <option value="name">{t('roster.sort.name')}</option>
           </select>
         </div>
       </div>
@@ -79,7 +82,7 @@ export default function Roster({ hub, selectedId, onSelect }: Props): JSX.Elemen
       <div className="roster">
         {filtered.pinned.length > 0 && (
           <>
-            <div className="roster-group">Épinglés</div>
+            <div className="roster-group">{t('roster.group.pinned')}</div>
             {filtered.pinned.map((c) => (
               <Row key={c.id} c={c} active={c.id === selectedId} onSelect={onSelect} />
             ))}
@@ -88,7 +91,9 @@ export default function Roster({ hub, selectedId, onSelect }: Props): JSX.Elemen
 
         {filtered.normal.length > 0 && (
           <>
-            {filtered.pinned.length > 0 && <div className="roster-group">Personnages</div>}
+            {filtered.pinned.length > 0 && (
+              <div className="roster-group">{t('roster.group.normal')}</div>
+            )}
             {filtered.normal.map((c) => (
               <Row key={c.id} c={c} active={c.id === selectedId} onSelect={onSelect} />
             ))}
@@ -97,7 +102,7 @@ export default function Roster({ hub, selectedId, onSelect }: Props): JSX.Elemen
 
         {filtered.hidden.length > 0 && (
           <>
-            <div className="roster-group">Masqués</div>
+            <div className="roster-group">{t('roster.group.hidden')}</div>
             {filtered.hidden.map((c) => (
               <Row key={c.id} c={c} active={c.id === selectedId} onSelect={onSelect} muted />
             ))}
@@ -106,7 +111,7 @@ export default function Roster({ hub, selectedId, onSelect }: Props): JSX.Elemen
 
         {total === 0 && !hub.loading && (
           <p className="faint" style={{ padding: '20px 10px', textAlign: 'center' }}>
-            Aucun personnage synchronisé pour l'instant.
+            {t('roster.empty')}
           </p>
         )}
       </div>
@@ -135,11 +140,13 @@ export default function Roster({ hub, selectedId, onSelect }: Props): JSX.Elemen
           disabled={syncing || !hub.auth.connected}
           style={{ justifyContent: 'center' }}
         >
-          {syncing ? 'Synchronisation…' : 'Synchroniser le compte'}
+          {syncing ? t('roster.syncing') : t('roster.sync')}
         </button>
         {hub.data.lastSyncAt && (
           <div className="faint" style={{ textAlign: 'center' }}>
-            Dernière synchro : {new Date(hub.data.lastSyncAt).toLocaleString('fr-FR')}
+            {t('roster.lastSync', {
+              date: new Date(hub.data.lastSyncAt).toLocaleString()
+            })}
           </div>
         )}
       </div>
@@ -170,7 +177,7 @@ function Row({
         </div>
         <div className="sub">
           {c.realm} · {c.specName ? `${c.specName} ` : ''}
-          {c.className} · niv. {c.level}
+          {c.className} · {c.level}
         </div>
       </div>
       <div className="ilvl">

@@ -6,10 +6,13 @@ import type {
   AuthStatus,
   DroptimizerReport,
   ExportResult,
+  JournalStatus,
   SyncResult,
   WowInstall
 } from '@shared/types'
 import { store } from './store'
+import { t } from './i18n'
+import { ensureIndex, journalStatus } from './journal'
 import { authorize, clearToken, getToken, redirectUri } from './oauth'
 import { syncAll, syncOne } from './sync'
 import { detectInstalls, flavorsIn, normalizeWowRoot } from './wowPath'
@@ -31,7 +34,7 @@ function handle<T>(channel: string, fn: (...args: any[]) => Promise<T> | T): voi
     try {
       return { ok: true, data: await fn(...args) }
     } catch (err) {
-      return { ok: false, error: (err as Error).message }
+      return { ok: false, error: (err as Error).message || t('err.unknown') }
     }
   })
 }
@@ -125,11 +128,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
   handle<DroptimizerReport>('report:importUrl', async (input: string, characterId: string) => {
     const reportId = extractReportId(input)
-    if (!reportId) {
-      throw new Error(
-        "Lien Raidbots non reconnu. Attendu : https://www.raidbots.com/simbot/report/XXXX ou l'identifiant seul."
-      )
-    }
+    if (!reportId) throw new Error(t('err.badReportLink'))
     const raw = await fetchReport(reportId)
     const report = await buildReport(raw, reportId, characterId)
     flushItemCache()
@@ -171,7 +170,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     const win = getWindow()
     const result = win
       ? await dialog.showOpenDialog(win, {
-          title: 'Sélectionne le dossier World of Warcraft',
+          title: t('settings.wow'),
           properties: ['openDirectory']
         })
       : await dialog.showOpenDialog({ properties: ['openDirectory'] })
@@ -179,16 +178,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     if (result.canceled || !result.filePaths[0]) return null
     const normalized = normalizeWowRoot(result.filePaths[0])
     if (!normalized) {
-      throw new Error(
-        "Ce dossier ne contient pas d'installation WoW. Choisis le dossier qui contient _retail_."
-      )
+      throw new Error(t('err.notWowFolder'))
     }
     return { path: normalized, flavors: flavorsIn(normalized) }
   })
 
   handle<WowInstall>('wow:setPath', (input: string) => {
     const normalized = normalizeWowRoot(input)
-    if (!normalized) throw new Error('Chemin invalide : aucun dossier de saveur WoW trouvé.')
+    if (!normalized) throw new Error(t('err.badPath'))
     const flavors = flavorsIn(normalized)
     // On ne conserve la saveur choisie que si elle existe dans cette
     // installation ; sinon on retombe sur la première disponible.
@@ -200,6 +197,15 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return { path: normalized, flavors }
   })
 
+  // -- index du butin ------------------------------------------------------
+
+  handle<JournalStatus>('journal:status', () => journalStatus())
+
+  handle<JournalStatus>('journal:rebuild', async () => {
+    await ensureIndex(true)
+    return journalStatus()
+  })
+
   // -- export --------------------------------------------------------------
 
   handle<ExportResult>('export:run', () => exportToAddon())
@@ -209,14 +215,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle<ExportResult>('export:saveAs', async () => {
     const win = getWindow()
     const options = {
-      title: 'Enregistrer les données addon',
+      title: t('export.saveAs'),
       defaultPath: 'Export.lua',
-      filters: [{ name: 'Script Lua', extensions: ['lua'] }]
+      filters: [{ name: 'Lua', extensions: ['lua'] }]
     }
     const result = win
       ? await dialog.showSaveDialog(win, options)
       : await dialog.showSaveDialog(options)
-    if (result.canceled || !result.filePath) return { ok: false, error: 'Annulé.' }
+    if (result.canceled || !result.filePath) return { ok: false, error: t('common.cancel') }
     return exportToFile(result.filePath)
   })
 
@@ -224,7 +230,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
   handle('shell:openExternal', (url: string) => {
     // Liste blanche : on n'ouvre que du http(s), jamais un chemin local arbitraire.
-    if (!/^https?:\/\//i.test(url)) throw new Error('URL refusée.')
+    if (!/^https?:\/\//i.test(url)) throw new Error(t('err.urlRefused'))
     return shell.openExternal(url)
   })
 

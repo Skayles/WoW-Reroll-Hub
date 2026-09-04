@@ -43,27 +43,6 @@ export const SLOT_ORDER = [
   'TABARD'
 ]
 
-export const SLOT_LABELS: Record<string, string> = {
-  HEAD: 'Tête',
-  NECK: 'Cou',
-  SHOULDER: 'Épaules',
-  BACK: 'Dos',
-  CHEST: 'Torse',
-  SHIRT: 'Chemise',
-  TABARD: 'Tabard',
-  WRIST: 'Poignets',
-  HANDS: 'Mains',
-  WAIST: 'Taille',
-  LEGS: 'Jambes',
-  FEET: 'Pieds',
-  FINGER_1: 'Anneau 1',
-  FINGER_2: 'Anneau 2',
-  TRINKET_1: 'Bijou 1',
-  TRINKET_2: 'Bijou 2',
-  MAIN_HAND: 'Main droite',
-  OFF_HAND: 'Main gauche'
-}
-
 /**
  * Slots enchantables sur la version actuelle du jeu. Sert à signaler les
  * enchantements manquants sans faux positif sur les slots qui n'en prennent pas.
@@ -93,18 +72,6 @@ export const QUALITY_COLORS: Record<string, string> = {
 
 export function qualityColor(quality: string): string {
   return QUALITY_COLORS[quality] ?? '#ffffff'
-}
-
-export const ROLE_LABELS: Record<string, string> = {
-  TANK: 'Tank',
-  HEALER: 'Soigneur',
-  DAMAGE: 'DPS'
-}
-
-export const FACTION_LABELS: Record<string, string> = {
-  ALLIANCE: 'Alliance',
-  HORDE: 'Horde',
-  NEUTRAL: 'Neutre'
 }
 
 /** Saveurs WoW connues, associées au nom de dossier sur disque. */

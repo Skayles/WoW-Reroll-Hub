@@ -2,25 +2,36 @@ import type {
   CharacterDetail,
   CharacterFocus,
   DroptimizerReport,
-  FocusEntry
+  DroptimizerUpgrade,
+  FocusEntry,
+  GearIssue,
+  SlotUpgrades,
+  WeakSlot
 } from './types'
+import { ENCHANTABLE_SLOTS } from './constants'
+import { slotCapacity, slotGroupRank, type SlotGroup } from './slots'
+
+/** Amélioration enrichie du contenu d'où elle provient. */
+export type TaggedUpgrade = DroptimizerUpgrade & { contentTag: string }
 
 /**
- * Classe les contenus simulés d'un personnage par potentiel de gain.
+ * Classe les contenus simulés d'un personnage par potentiel de gain, et calcule
+ * la meilleure pièce par emplacement.
  *
- * On ne se base pas uniquement sur le meilleur item : un seul objet à +8 % dans
- * un contenu où rien d'autre ne drop est moins intéressant qu'un contenu où
- * cinq objets rapportent +4 %. D'où le tri sur la moyenne des trois meilleurs
- * gains, le pic servant seulement de départage.
+ * Le classement ne se base pas uniquement sur le meilleur objet : un seul objet
+ * à +8 % dans un contenu où rien d'autre ne drop est moins intéressant qu'un
+ * contenu où cinq objets rapportent +4 %. D'où le tri sur la moyenne des trois
+ * meilleurs gains, le pic servant seulement de départage.
  */
 export function computeFocus(
   character: CharacterDetail,
   reports: DroptimizerReport[]
 ): CharacterFocus {
+  const own = reports.filter((r) => r.characterId === character.id)
+
   const byTag = new Map<string, DroptimizerReport[]>()
-  for (const report of reports) {
-    if (report.characterId !== character.id) continue
-    const tag = report.contentTag || report.contentLabel || 'Non classé'
+  for (const report of own) {
+    const tag = contentTagOf(report)
     const list = byTag.get(tag)
     if (list) list.push(report)
     else byTag.set(tag, [report])
@@ -55,40 +66,106 @@ export function computeFocus(
     entries,
     recommended: entries[0] ?? null,
     gearIssues: findGearIssues(character),
+    bySlot: computeBySlot(own),
     computedAt: Date.now()
   }
 }
 
+function contentTagOf(report: DroptimizerReport): string {
+  return report.contentTag || report.contentLabel || 'Non classé'
+}
+
 /**
- * Problèmes d'optimisation détectables sans simulation : enchantements manquants
- * et châsses vides. Ce sont des gains gratuits, à traiter avant tout farm.
+ * Meilleure amélioration par emplacement, tous rapports confondus.
+ *
+ * Sans ce regroupement, un droptimizer renvoie dix colliers concurrents alors
+ * qu'un seul peut être porté : la question utile est « quelle pièce viser pour
+ * ce slot », pas « quels sont les dix meilleurs objets ».
+ *
+ * Les anneaux et les bijoux gardent deux entrées, puisque deux se portent.
  */
-export function findGearIssues(character: CharacterDetail): string[] {
-  const issues: string[] = []
+export function computeBySlot(reports: DroptimizerReport[]): SlotUpgrades[] {
+  // Un même objet peut apparaître dans plusieurs rapports : on ne conserve que
+  // son meilleur gain, en mémorisant le contenu correspondant.
+  const bestByItem = new Map<number, TaggedUpgrade>()
+  const unidentified: TaggedUpgrade[] = []
+
+  for (const report of reports) {
+    const contentTag = contentTagOf(report)
+    for (const upgrade of report.upgrades) {
+      if (upgrade.gainPct <= 0) continue
+      const tagged: TaggedUpgrade = { ...upgrade, contentTag }
+
+      // itemId 0 = objet non résolu : il n'est pas dédoublonnable par identifiant.
+      if (!upgrade.itemId) {
+        unidentified.push(tagged)
+        continue
+      }
+      const previous = bestByItem.get(upgrade.itemId)
+      if (!previous || upgrade.gainPct > previous.gainPct) {
+        bestByItem.set(upgrade.itemId, tagged)
+      }
+    }
+  }
+
+  const byGroup = new Map<SlotGroup, TaggedUpgrade[]>()
+  for (const upgrade of [...bestByItem.values(), ...unidentified]) {
+    const list = byGroup.get(upgrade.slotGroup)
+    if (list) list.push(upgrade)
+    else byGroup.set(upgrade.slotGroup, [upgrade])
+  }
+
+  const slots: SlotUpgrades[] = []
+  for (const [slotGroup, list] of byGroup) {
+    list.sort((a, b) => b.gainPct - a.gainPct)
+    slots.push({
+      slotGroup,
+      upgrades: list.slice(0, slotCapacity(slotGroup)),
+      candidateCount: list.length
+    })
+  }
+
+  // Ordre du panneau d'équipement plutôt que par gain : on cherche un slot
+  // précis dans cette liste, elle doit rester à la même place d'un perso à l'autre.
+  slots.sort((a, b) => slotGroupRank(a.slotGroup) - slotGroupRank(b.slotGroup))
+  return slots
+}
+
+/**
+ * Problèmes détectables sans simulation : enchantements manquants et châsses
+ * vides. Ce sont des gains gratuits, à traiter avant tout farm.
+ *
+ * Renvoyés sous forme structurée : l'application et l'addon les rendent chacun
+ * dans leur propre langue.
+ */
+export function findGearIssues(character: CharacterDetail): GearIssue[] {
+  const issues: GearIssue[] = []
   for (const item of character.gear) {
-    if (item.missingEnchant) issues.push(`${item.slotLabel} : pas d'enchantement`)
+    if (item.missingEnchant) issues.push({ type: 'enchant', slot: item.slot })
     if (item.emptySockets > 0) {
-      issues.push(
-        `${item.slotLabel} : ${item.emptySockets} châsse${item.emptySockets > 1 ? 's' : ''} vide${
-          item.emptySockets > 1 ? 's' : ''
-        }`
-      )
+      issues.push({ type: 'socket', slot: item.slot, count: item.emptySockets })
     }
   }
   if (character.tierPieces > 0 && character.tierPieces < 4) {
-    issues.push(`Set de tier incomplet (${character.tierPieces}/4 pièces)`)
+    issues.push({ type: 'tier', count: character.tierPieces })
   }
   return issues
 }
 
 /** Écart entre le pire slot équipé et l'ilvl moyen : repère les slots à retard. */
-export function findWeakSlots(character: CharacterDetail, threshold = 6): string[] {
+export function findWeakSlots(character: CharacterDetail, threshold = 6): WeakSlot[] {
   if (!character.gear.length) return []
-  const relevant = character.gear.filter((g) => g.itemLevel > 0 && g.slot !== 'TABARD' && g.slot !== 'SHIRT')
+  const relevant = character.gear.filter(
+    (g) => g.itemLevel > 0 && g.slot !== 'TABARD' && g.slot !== 'SHIRT'
+  )
   if (!relevant.length) return []
+
   const avg = relevant.reduce((sum, g) => sum + g.itemLevel, 0) / relevant.length
   return relevant
     .filter((g) => avg - g.itemLevel >= threshold)
     .sort((a, b) => a.itemLevel - b.itemLevel)
-    .map((g) => `${g.slotLabel} (${g.itemLevel})`)
+    .map((g) => ({ slot: g.slot, itemLevel: g.itemLevel }))
 }
+
+/** Utilisé par ENCHANTABLE_SLOTS côté synchro ; réexporté pour commodité. */
+export { ENCHANTABLE_SLOTS }

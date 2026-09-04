@@ -25,6 +25,7 @@ export default function App(): JSX.Element {
   }, [hub.loading, hub.characters, hub.auth.connected, selectedId])
 
   const selected = selectedId ? hub.data.characters[selectedId] ?? null : null
+  const { t } = hub
 
   return (
     <div className="app">
@@ -43,13 +44,13 @@ export default function App(): JSX.Element {
             className={tab === 'character' ? 'active' : ''}
             onClick={() => setTab('character')}
           >
-            Personnage
+            {t('tab.character')}
           </button>
           <button className={tab === 'export' ? 'active' : ''} onClick={() => setTab('export')}>
-            Export addon
+            {t('tab.export')}
           </button>
           <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
-            Réglages
+            {t('tab.settings')}
           </button>
         </div>
 
@@ -57,7 +58,7 @@ export default function App(): JSX.Element {
           <div
             className={hub.banner.kind === 'ok' ? 'ok-box' : 'error-box'}
             onClick={() => hub.setBanner(null)}
-            title="Cliquer pour masquer"
+            title={t('common.close')}
           >
             {hub.banner.text}
           </div>
@@ -68,12 +69,8 @@ export default function App(): JSX.Element {
             <CharacterView hub={hub} character={selected} />
           ) : (
             <div className="empty">
-              <h3>Aucun personnage</h3>
-              <p>
-                Connecte-toi à Battle.net dans <strong>Réglages</strong>, puis lance une
-                synchronisation : tous les persos du compte apparaîtront ici sans avoir à te
-                connecter en jeu sur chacun.
-              </p>
+              <h3>{t('char.empty.title')}</h3>
+              <p>{t('char.empty.body')}</p>
             </div>
           ))}
 

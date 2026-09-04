@@ -121,7 +121,7 @@ local function BuildFrame()
 
 	local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", 14, -12)
-	title:SetText(COLOR_ACCENT .. "Reroll Helper" .. R)
+	title:SetText(COLOR_ACCENT .. RH.L.title .. R)
 
 	frame.subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	frame.subtitle:SetPoint("TOPLEFT", 16, -32)
@@ -139,11 +139,12 @@ local function BuildFrame()
 	listPanel:SetSize(LIST_WIDTH, HEIGHT - 66)
 	StyleBackdrop(listPanel, 0.08, 0.10, 0.13, 1)
 
+	local L = RH.L
 	sortButtons = {
-		CreateSortButton(listPanel, "ilvl", "Ilvl", 6),
-		CreateSortButton(listPanel, "mplus", "M+", 74),
-		CreateSortButton(listPanel, "focus", "Focus", 142),
-		CreateSortButton(listPanel, "name", "Nom", 210),
+		CreateSortButton(listPanel, "ilvl", L.sortIlvl, 6),
+		CreateSortButton(listPanel, "mplus", L.sortMplus, 74),
+		CreateSortButton(listPanel, "focus", L.sortFocus, 142),
+		CreateSortButton(listPanel, "name", L.sortName, 210),
 	}
 
 	local scroll = CreateFrame("ScrollFrame", "RerollHelperScroll", listPanel, "UIPanelScrollFrameTemplate")
@@ -267,65 +268,86 @@ local function FindCharacter(id)
 end
 
 local function BuildDetailText(character)
+	local L = RH.L
 	local lines = {}
 	local function add(text)
 		lines[#lines + 1] = text or ""
 	end
 
 	-- Contenu à focus : c'est l'information qui motive tout l'addon.
-	add(COLOR_ACCENT .. "Contenu à focus" .. R)
+	add(COLOR_ACCENT .. L.focusHeader .. R)
 	if character.contents and #character.contents > 0 then
 		for index, content in ipairs(character.contents) do
 			local prefix = index == 1 and (COLOR_GREEN .. "→ " .. R) or "   "
-			add(("%s%s  %s%s%s  %s(pic %s · %d objets)%s"):format(
+			add(("%s%s  %s%s%s  %s%s%s"):format(
 				prefix,
 				content.tag or "?",
 				COLOR_GREEN,
 				RH:FormatPercent(content.top3AvgPct),
 				R,
 				COLOR_FAINT,
-				RH:FormatPercent(content.bestGainPct),
-				content.upgradeCount or 0,
+				L.focusPeak:format(RH:FormatPercent(content.bestGainPct), content.upgradeCount or 0),
 				R
 			))
 		end
 	else
-		add(COLOR_FAINT .. "Aucun droptimizer importé pour ce perso dans l'application." .. R)
+		add(COLOR_FAINT .. L.focusNone .. R)
 	end
 	add("")
 
-	if character.upgrades and #character.upgrades > 0 then
-		add(COLOR_ACCENT .. "Objets prioritaires" .. R)
-		for _, upgrade in ipairs(character.upgrades) do
-			add(("  %s  %s%s%s  %s%s%s"):format(
-				upgrade.name or "?",
-				COLOR_GREEN,
-				RH:FormatPercent(upgrade.gainPct),
-				R,
-				COLOR_FAINT,
-				upgrade.content and ("— " .. upgrade.content) or "",
-				R
-			))
+	-- Meilleure pièce par emplacement : une ligne de slot, puis ses objets avec
+	-- le boss qui les fait tomber. C'est la vue directement actionnable en jeu.
+	if character.bySlot and #character.bySlot > 0 then
+		add(COLOR_ACCENT .. L.bySlotHeader .. R)
+		for _, slot in ipairs(character.bySlot) do
+			local extra = ""
+			if slot.candidates and slot.candidates > #slot.items then
+				extra = ("  %s%s%s"):format(COLOR_FAINT, L.bySlotMore:format(slot.candidates), R)
+			end
+			add(("  %s%s%s%s"):format(COLOR_DIM, RH:GroupName(slot.slot), R, extra))
+
+			for _, item in ipairs(slot.items or {}) do
+				local source
+				if item.boss and item.boss ~= "" then
+					source = item.instance ~= "" and (item.boss .. " — " .. item.instance) or item.boss
+				elseif item.instance and item.instance ~= "" then
+					source = item.instance
+				else
+					source = L.sourceUnknown
+				end
+
+				add(("      %s  %s%s%s"):format(
+					item.name or "?",
+					COLOR_GREEN,
+					RH:FormatPercent(item.gainPct),
+					R
+				))
+				add(("         %s%s%s"):format(COLOR_FAINT, source, R))
+			end
 		end
 		add("")
 	end
 
 	if character.issues and #character.issues > 0 then
-		add(COLOR_ACCENT .. "À corriger" .. R)
+		add(COLOR_ACCENT .. L.issuesHeader .. R)
 		for _, issue in ipairs(character.issues) do
-			add(COLOR_ORANGE .. "  • " .. issue .. R)
+			add(COLOR_ORANGE .. "  • " .. RH:IssueText(issue) .. R)
 		end
 		add("")
 	end
 
 	if character.weakSlots and #character.weakSlots > 0 then
-		add(COLOR_ACCENT .. "Slots en retard" .. R)
-		add(COLOR_DIM .. "  " .. table.concat(character.weakSlots, ", ") .. R)
+		add(COLOR_ACCENT .. L.weakHeader .. R)
+		local parts = {}
+		for _, weak in ipairs(character.weakSlots) do
+			parts[#parts + 1] = ("%s (%d)"):format(RH:SlotName(weak.slot), weak.ilvl or 0)
+		end
+		add(COLOR_DIM .. "  " .. table.concat(parts, ", ") .. R)
 		add("")
 	end
 
 	if character.raids and #character.raids > 0 then
-		add(COLOR_ACCENT .. "Progression raid" .. R)
+		add(COLOR_ACCENT .. L.raidHeader .. R)
 		for _, raid in ipairs(character.raids) do
 			add(("  %s%s — %s : %d/%d%s"):format(
 				COLOR_DIM,
@@ -340,7 +362,7 @@ local function BuildDetailText(character)
 	end
 
 	if character.note and character.note ~= "" then
-		add(COLOR_ACCENT .. "Note" .. R)
+		add(COLOR_ACCENT .. L.noteHeader .. R)
 		add(COLOR_DIM .. "  " .. character.note .. R)
 	end
 
@@ -354,7 +376,7 @@ local function RenderDetail()
 		detail.name:SetText("")
 		detail.meta:SetText("")
 		detail.kpi:SetText("")
-		detail.body:SetText(COLOR_FAINT .. "Sélectionne un personnage dans la liste." .. R)
+		detail.body:SetText(COLOR_FAINT .. RH.L.pickCharacter .. R)
 		detail.bodyChild:SetHeight(40)
 		return
 	end
@@ -400,11 +422,10 @@ function RH:Refresh()
 	local status, message = self:GetDataStatus()
 
 	if status == "ok" or status == "stale" then
-		frame.subtitle:SetText(("%s%d personnages · export du %s%s%s"):format(
+		frame.subtitle:SetText(("%s%s%s%s"):format(
 			COLOR_FAINT,
-			#data.characters,
-			self:FormatDate(data.generatedAt),
-			status == "stale" and ("  " .. COLOR_ORANGE .. "(données anciennes)") or "",
+			self.L.summary:format(#data.characters, self:FormatDate(data.generatedAt)),
+			status == "stale" and ("  " .. COLOR_ORANGE .. self.L.staleShort) or "",
 			R
 		))
 	else

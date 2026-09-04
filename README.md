@@ -6,6 +6,8 @@ Application de bureau + addon WoW pour piloter un roster multi-personnages **san
 - Tu y colles tes rapports **Droptimizer** de Raidbots : l'app classe tes contenus (raid HM, raid mythique, donjons…) par potentiel de gain et te dit lequel focus sur ce perso.
 - L'**addon** `RerollHelper` reçoit ce récap et l'affiche en jeu via `/rh`.
 
+L'application et l'addon sont disponibles en **français et en anglais** (*Réglages → Langue de l'application*, l'addon suit ce choix au prochain export).
+
 ```
 Projet app reroll wow/
 ├─ app/                     Application Electron + React + TypeScript
@@ -81,6 +83,7 @@ Bouton **Synchroniser le compte** en bas de la liste. L'app interroge :
 | Score et clés Mythique+ | `…/mythic-keystone-profile` |
 | Progression raid | `…/encounters/raids` |
 | Métiers | `…/professions` |
+| Objet → boss qui le fait tomber | `/data/wow/journal-instance`, `/data/wow/journal-encounter` |
 
 Un perso en échec (renommé, transféré, supprimé) n'interrompt pas la synchro : il est signalé et les autres passent quand même.
 
@@ -95,6 +98,18 @@ Dans la fiche d'un perso, section **Droptimizer** :
 3. Renomme l'étiquette de contenu si besoin — deux rapports partageant la même étiquette sont regroupés dans une seule priorité.
 
 Le classement affiché trie les contenus sur la **moyenne des trois meilleurs gains**, pas sur le pic : un contenu qui lâche cinq objets à +4 % vaut mieux qu'un contenu avec un seul objet à +8 %.
+
+### Meilleure pièce par slot
+
+Sous le classement, la vue **Meilleur par slot** ne garde qu'une ligne par emplacement — deux pour les anneaux et les bijoux, puisque deux s'équipent. Un droptimizer renvoie facilement dix colliers concurrents alors qu'un seul se porte : la question utile est « quelle pièce viser pour ce slot », pas « quels sont les dix meilleurs objets ». Le compteur à droite du nom du slot indique combien d'objets étaient en lice.
+
+L'onglet **Tous les objets** conserve la liste complète, rapport par rapport.
+
+### D'où tombe chaque objet
+
+Chaque amélioration affiche le **boss et le donjon/raid** qui la font tomber. L'association vient du journal des aventures de Blizzard (`/data/wow/journal-*`), la seule source officielle qui relie un identifiant d'objet à sa rencontre.
+
+L'index est construit automatiquement au premier import, puis mis en cache. Il couvre les deux dernières extensions. S'il manque des sources, *Réglages → Index du butin → Reconstruire l'index*.
 
 **Si le rapport a expiré** (Raidbots purge les rapports gratuits au bout d'un mois) : bascule le champ en mode **JSON** et colle le contenu du `data.json` du rapport, que tu peux télécharger depuis la page Raidbots tant qu'elle est vivante.
 
@@ -118,7 +133,9 @@ L'export automatique après chaque synchro est activé par défaut (désactivabl
 | `/rh status` | État et date des données exportées |
 | `/rh help` | Aide |
 
-La fenêtre liste tous les persos (triables par ilvl, score M+, focus, nom) et affiche pour le perso sélectionné : le contenu à focus, les objets prioritaires, les enchantements et châsses manquants, les slots en retard, la progression raid et ta note.
+La fenêtre liste tous les persos (triables par ilvl, score M+, focus, nom) et affiche pour le perso sélectionné : le contenu à focus, la meilleure pièce par slot avec le boss qui la fait tomber, les enchantements et châsses manquants, les slots en retard, la progression raid et ta note.
+
+L'addon suit la langue choisie dans l'application. À défaut d'export, il utilise celle du client WoW (français, anglais sinon).
 
 ---
 

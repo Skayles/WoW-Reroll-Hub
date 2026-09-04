@@ -1,5 +1,6 @@
 import type { Region } from '@shared/types'
 import { getToken } from './oauth'
+import { t } from './i18n'
 import { store } from './store'
 
 /** Levée quand l'API répond 404 : perso supprimé, renommé ou jamais connecté. */
@@ -8,7 +9,7 @@ export class NotFoundError extends Error {}
 /** Levée quand le jeton est absent ou expiré : le renderer doit relancer l'auth. */
 export class AuthExpiredError extends Error {
   constructor() {
-    super('Session Battle.net expirée, reconnecte-toi.')
+    super(t('err.authExpired'))
   }
 }
 
@@ -101,12 +102,12 @@ async function fetchWithRetry<T>(
       await sleep(500 * (attempt + 1))
       return fetchWithRetry<T>(url, accessToken, options, attempt + 1)
     }
-    throw new Error(`Réseau indisponible : ${(err as Error).message}`)
+    throw new Error(t('err.network', { message: (err as Error).message }))
   }
 
   if (res.status === 404) {
     if (options.optional) return null
-    throw new NotFoundError(`Ressource introuvable : ${url.pathname}`)
+    throw new NotFoundError(t('err.notFound', { path: url.pathname }))
   }
 
   if (res.status === 401 || res.status === 403) {
@@ -123,11 +124,11 @@ async function fetchWithRetry<T>(
       await sleep(delay)
       return fetchWithRetry<T>(url, accessToken, options, attempt + 1)
     }
-    throw new Error(`API Blizzard indisponible (${res.status}) sur ${url.pathname}`)
+    throw new Error(t('err.apiDown', { status: res.status, path: url.pathname }))
   }
 
   if (!res.ok) {
-    throw new Error(`Erreur API ${res.status} sur ${url.pathname}`)
+    throw new Error(t('err.api', { status: res.status, path: url.pathname }))
   }
 
   return (await res.json()) as T

@@ -4,7 +4,10 @@
  * (voir EXPORT_SCHEMA_VERSION).
  */
 
-export const EXPORT_SCHEMA_VERSION = 1
+import type { Lang } from './i18n'
+import type { SlotGroup } from './slots'
+
+export const EXPORT_SCHEMA_VERSION = 2
 
 export type Region = 'eu' | 'us' | 'kr' | 'tw'
 
@@ -29,6 +32,8 @@ export interface AppSettings {
   clientSecret: string
   region: Region
   locale: string
+  /** Langue de l'interface et de l'addon. */
+  language: Lang
   /** Les persos sous ce niveau ne sont pas synchronisés. */
   minLevel: number
   /** Chemin racine de l'installation WoW (ex: C:\Program Files (x86)\World of Warcraft). */
@@ -70,8 +75,8 @@ export interface CharacterRef {
 }
 
 export interface GearItem {
+  /** Slot d'equipement Blizzard (HEAD, FINGER_1...). Traduit a l'affichage. */
   slot: string
-  slotLabel: string
   itemId: number
   name: string
   itemLevel: number
@@ -145,9 +150,12 @@ export interface CharacterDetail extends CharacterRef {
 export interface DroptimizerUpgrade {
   itemId: number
   itemName: string
-  slot: string
-  /** Difficulté / source telle que fournie par le rapport, si disponible. */
-  source: string
+  /** Emplacement normalise, seul moyen fiable de regrouper par slot. */
+  slotGroup: SlotGroup
+  /** Donjon ou raid d'ou tombe l'objet, resolu via le journal Blizzard. */
+  instance: string | null
+  /** Boss qui fait tomber l'objet. */
+  boss: string | null
   dps: number
   /** Gain absolu de dps par rapport au baseline. */
   gain: number
@@ -189,14 +197,50 @@ export interface FocusEntry {
   reportIds: string[]
 }
 
+/** Meilleure(s) amélioration(s) trouvée(s) pour un emplacement donné. */
+export interface SlotUpgrades {
+  slotGroup: SlotGroup
+  /** Triées par gain décroissant, limitées à la capacité du slot. */
+  upgrades: (DroptimizerUpgrade & { contentTag: string })[]
+  /** Nombre total d'objets candidats sur ce slot, avant limitation. */
+  candidateCount: number
+}
+
+export type GearIssueType = 'enchant' | 'socket' | 'tier'
+
+/**
+ * Problème d'équipement décrit de façon structurée plutôt que par une phrase :
+ * l'application et l'addon peuvent ainsi le rendre chacun dans leur langue.
+ */
+export interface GearIssue {
+  type: GearIssueType
+  /** Slot concerné, absent pour un problème global comme le set de tier. */
+  slot?: string
+  count?: number
+}
+
+export interface WeakSlot {
+  slot: string
+  itemLevel: number
+}
+
 export interface CharacterFocus {
   characterId: string
   entries: FocusEntry[]
   /** Contenu recommandé (première entrée), null si aucun droptimizer. */
   recommended: FocusEntry | null
-  /** Slots sans enchantement ou avec châsses vides. */
-  gearIssues: string[]
+  gearIssues: GearIssue[]
+  /** Meilleure pièce par emplacement, tous rapports confondus. */
+  bySlot: SlotUpgrades[]
   computedAt: number
+}
+
+/** État de l'index associant un objet au boss qui le fait tomber. */
+export interface JournalStatus {
+  itemCount: number
+  builtAt: number | null
+  locale: string | null
+  building: boolean
 }
 
 // ---------------------------------------------------------------------------

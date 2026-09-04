@@ -2,12 +2,14 @@ import { app, safeStorage } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { AppData, AppSettings } from '@shared/types'
+import { defaultLang } from '@shared/i18n'
 
 const DEFAULT_SETTINGS: AppSettings = {
   clientId: '',
   clientSecret: '',
   region: 'eu',
   locale: 'fr_FR',
+  language: 'fr',
   minLevel: 10,
   wowPath: null,
   wowFlavor: '_retail_',
@@ -47,6 +49,14 @@ class Store {
     this.tokenPath = path.join(dir, 'token.bin')
     this.settings = this.readSettings()
     this.data = this.readData()
+
+    // Premier lancement : on suit la langue du système plutôt que d'imposer
+    // le français à un utilisateur anglophone.
+    if (!fs.existsSync(this.settingsPath)) {
+      this.settings.language = defaultLang(app.getLocale())
+      if (this.settings.language === 'en') this.settings.locale = 'en_GB'
+      this.saveSettings({})
+    }
   }
 
   // -- secrets -------------------------------------------------------------

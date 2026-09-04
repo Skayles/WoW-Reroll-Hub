@@ -7,6 +7,7 @@ import type {
   DroptimizerReport,
   ExportResult,
   IpcResponse,
+  JournalStatus,
   SyncProgress,
   SyncResult,
   WowInstall
@@ -63,6 +64,10 @@ const api = {
     detect: () => call<WowInstall[]>('wow:detect'),
     browse: () => call<WowInstall | null>('wow:browse'),
     setPath: (input: string) => call<WowInstall>('wow:setPath', input)
+  },
+  journal: {
+    status: () => call<JournalStatus>('journal:status'),
+    rebuild: () => call<JournalStatus>('journal:rebuild')
   },
   exporter: {
     run: () => call<ExportResult>('export:run'),
