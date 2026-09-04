@@ -279,11 +279,13 @@ local function BuildDetailText(character)
 	if character.contents and #character.contents > 0 then
 		for index, content in ipairs(character.contents) do
 			local prefix = index == 1 and (COLOR_GREEN .. "→ " .. R) or "   "
-			add(("%s%s  %s%s%s  %s%s%s"):format(
+			local avgGain = RH:FormatGain(content.top3AvgGain)
+			add(("%s%s  %s%s%s%s  %s%s%s"):format(
 				prefix,
 				content.tag or "?",
 				COLOR_GREEN,
 				RH:FormatPercent(content.top3AvgPct),
+				avgGain and (" (" .. avgGain .. ")") or "",
 				R,
 				COLOR_FAINT,
 				L.focusPeak:format(RH:FormatPercent(content.bestGainPct), content.upgradeCount or 0),
@@ -316,10 +318,12 @@ local function BuildDetailText(character)
 					source = L.sourceUnknown
 				end
 
-				add(("      %s  %s%s%s"):format(
+				local gain = RH:FormatGain(item.gain)
+				add(("      %s  %s%s%s%s"):format(
 					item.name or "?",
 					COLOR_GREEN,
 					RH:FormatPercent(item.gainPct),
+					gain and (" (" .. gain .. ")") or "",
 					R
 				))
 				add(("         %s%s%s"):format(COLOR_FAINT, source, R))

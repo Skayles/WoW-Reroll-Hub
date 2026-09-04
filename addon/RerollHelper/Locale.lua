@@ -30,6 +30,7 @@ translations.en = {
 	focusHeader = "Content to focus",
 	focusNone = "No droptimizer imported for this character in the application.",
 	focusPeak = "peak %s · %d items",
+	gainDps = "+%s dps",
 	bySlotHeader = "Best piece per slot",
 	bySlotMore = "%d candidates",
 	sourceUnknown = "unknown source",
@@ -109,6 +110,7 @@ translations.fr = {
 	focusHeader = "Contenu à focus",
 	focusNone = "Aucun droptimizer importé pour ce perso dans l'application.",
 	focusPeak = "pic %s · %d objets",
+	gainDps = "+%s dps",
 	bySlotHeader = "Meilleure pièce par slot",
 	bySlotMore = "%d candidats",
 	sourceUnknown = "source inconnue",
@@ -194,6 +196,17 @@ local fallback = {
 function RH:LoadLocale()
 	self.L = setmetatable(resolve(), fallback)
 	return self.L
+end
+
+--- Gain de dps absolu, avec séparateurs de milliers.
+--- BreakUpLargeNumbers suit la locale du client ; repli brut si absent.
+function RH:FormatGain(value)
+	if not value or value == 0 then
+		return nil
+	end
+	local rounded = math.floor(value + 0.5)
+	local text = BreakUpLargeNumbers and BreakUpLargeNumbers(rounded) or tostring(rounded)
+	return self.L.gainDps:format(text)
 end
 
 --- Nom lisible d'un slot d'équipement (HEAD, FINGER_1...).

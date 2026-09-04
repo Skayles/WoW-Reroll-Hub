@@ -6,6 +6,7 @@ import type {
   DroptimizerUpgrade
 } from '@shared/types'
 import { slotCapacity } from '@shared/slots'
+import { numberLocale } from '@shared/i18n'
 import type { Hub } from '../state'
 
 interface Props {
@@ -19,6 +20,7 @@ type View = 'bySlot' | 'all'
 
 export default function Droptimizer({ hub, character, reports, focus }: Props): JSX.Element {
   const { t } = hub
+  const nf = numberLocale(hub.settings?.language ?? 'fr')
   const [input, setInput] = useState('')
   const [jsonMode, setJsonMode] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -103,9 +105,17 @@ export default function Droptimizer({ hub, character, reports, focus }: Props): 
                 </div>
                 <div className="gain">
                   <b>+{entry.top3AvgPct.toFixed(2)}%</b>
+                  <div className="gain-dps">
+                    {t('dropt.gainDps', {
+                      value: Math.round(entry.top3AvgGain).toLocaleString(nf)
+                    })}
+                  </div>
                   <div className="faint">{t('dropt.focus.top3')}</div>
                   <div className="faint">
-                    {t('dropt.focus.peak', { value: entry.bestGainPct.toFixed(2) })}
+                    {t('dropt.focus.peak', { value: entry.bestGainPct.toFixed(2) })} ·{' '}
+                    {t('dropt.gainDps', {
+                      value: Math.round(entry.bestGain).toLocaleString(nf)
+                    })}
                   </div>
                 </div>
               </div>
@@ -125,10 +135,10 @@ export default function Droptimizer({ hub, character, reports, focus }: Props): 
           </div>
 
           {view === 'bySlot' ? (
-            <BySlot hub={hub} focus={focus} />
+            <BySlot hub={hub} focus={focus} nf={nf} />
           ) : (
             reports.map((report) => (
-              <ReportBlock key={report.reportId} hub={hub} report={report} />
+              <ReportBlock key={report.reportId} hub={hub} report={report} nf={nf} />
             ))
           )}
         </>
@@ -144,7 +154,7 @@ export default function Droptimizer({ hub, character, reports, focus }: Props): 
  * à rien quand un seul se porte. Les anneaux et bijoux gardent deux lignes,
  * puisque deux s'équipent.
  */
-function BySlot({ hub, focus }: { hub: Hub; focus: CharacterFocus }): JSX.Element {
+function BySlot({ hub, focus, nf }: { hub: Hub; focus: CharacterFocus; nf: string }): JSX.Element {
   const { t } = hub
   const slots = focus.bySlot.filter((slot) => slot.upgrades.length > 0)
 
@@ -164,7 +174,13 @@ function BySlot({ hub, focus }: { hub: Hub; focus: CharacterFocus }): JSX.Elemen
             </div>
             <div className="slot-items">
               {slot.upgrades.map((upgrade) => (
-                <UpgradeRow key={`${upgrade.itemId}-${upgrade.itemName}`} hub={hub} upgrade={upgrade} content={upgrade.contentTag} />
+                <UpgradeRow
+                  key={`${upgrade.itemId}-${upgrade.itemName}`}
+                  hub={hub}
+                  upgrade={upgrade}
+                  content={upgrade.contentTag}
+                  nf={nf}
+                />
               ))}
             </div>
           </div>
@@ -177,11 +193,13 @@ function BySlot({ hub, focus }: { hub: Hub; focus: CharacterFocus }): JSX.Elemen
 function UpgradeRow({
   hub,
   upgrade,
-  content
+  content,
+  nf
 }: {
   hub: Hub
   upgrade: DroptimizerUpgrade
   content?: string
+  nf: string
 }): JSX.Element {
   const { t } = hub
 
@@ -204,12 +222,17 @@ function UpgradeRow({
           {content ? ` · ${content}` : ''}
         </div>
       </div>
-      <div className="gain">+{upgrade.gainPct.toFixed(2)}%</div>
+      <div className="gain">
+        +{upgrade.gainPct.toFixed(2)}%
+        <div className="gain-dps">
+          {t('dropt.gainDps', { value: Math.round(upgrade.gain).toLocaleString(nf) })}
+        </div>
+      </div>
     </div>
   )
 }
 
-function ReportBlock({ hub, report }: { hub: Hub; report: DroptimizerReport }): JSX.Element {
+function ReportBlock({ hub, report, nf }: { hub: Hub; report: DroptimizerReport; nf: string }): JSX.Element {
   const { t } = hub
   const [tag, setTag] = useState(report.contentTag)
   const [open, setOpen] = useState(false)
@@ -230,7 +253,7 @@ function ReportBlock({ hub, report }: { hub: Hub; report: DroptimizerReport }): 
             title={t('dropt.report.tagHint')}
           />
           <div className="faint">
-            {t('dropt.report.baseline', { dps: report.baselineDps.toLocaleString() })} ·{' '}
+            {t('dropt.report.baseline', { dps: report.baselineDps.toLocaleString(nf) })} ·{' '}
             {report.fightStyle ?? t('dropt.report.style')}
             {report.targets ? ` · ${t('dropt.report.targets', { count: report.targets })}` : ''} ·{' '}
             {t('dropt.report.imported', {
@@ -253,7 +276,7 @@ function ReportBlock({ hub, report }: { hub: Hub; report: DroptimizerReport }): 
       ))}
 
       {shown.map((upgrade) => (
-        <UpgradeRow key={`${upgrade.itemId}-${upgrade.itemName}`} hub={hub} upgrade={upgrade} />
+        <UpgradeRow key={`${upgrade.itemId}-${upgrade.itemName}`} hub={hub} upgrade={upgrade} nf={nf} />
       ))}
 
       {report.upgrades.length > 8 && (

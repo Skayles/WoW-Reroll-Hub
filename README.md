@@ -107,7 +107,7 @@ L'onglet **Tous les objets** conserve la liste complète, rapport par rapport.
 
 ### D'où tombe chaque objet
 
-Chaque amélioration affiche le **boss et le donjon/raid** qui la font tomber. L'association vient du journal des aventures de Blizzard (`/data/wow/journal-*`), la seule source officielle qui relie un identifiant d'objet à sa rencontre.
+Chaque amélioration affiche son gain en **pourcentage et en dps absolu**, ainsi que le **boss et le donjon/raid** qui la font tomber. Le pourcentage reste la lecture principale — c'est lui qui se compare d'un personnage à l'autre — mais le dps donne l'ordre de grandeur réel du gain. L'association vient du journal des aventures de Blizzard (`/data/wow/journal-*`), la seule source officielle qui relie un identifiant d'objet à sa rencontre.
 
 L'index est construit automatiquement au premier import, puis mis en cache. Il couvre les deux dernières extensions. S'il manque des sources, *Réglages → Index du butin → Reconstruire l'index*.
 

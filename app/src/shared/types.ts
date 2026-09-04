@@ -190,8 +190,12 @@ export interface FocusEntry {
   contentTag: string
   /** Meilleur gain en % trouvé dans ce contenu. */
   bestGainPct: number
+  /** Le même gain en dps absolu. */
+  bestGain: number
   /** Moyenne des 3 meilleurs gains : plus représentative qu'un pic isolé. */
   top3AvgPct: number
+  /** Moyenne des 3 meilleurs gains, en dps absolu. */
+  top3AvgGain: number
   upgradeCount: number
   bestItem: DroptimizerUpgrade | null
   reportIds: string[]

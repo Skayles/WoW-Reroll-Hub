@@ -84,14 +84,18 @@ function serializeCharacter(
       ? {
           content: focus.recommended.contentTag,
           bestGainPct: round2(focus.recommended.bestGainPct),
+          bestGain: Math.round(focus.recommended.bestGain),
           top3AvgPct: round2(focus.recommended.top3AvgPct),
+          top3AvgGain: Math.round(focus.recommended.top3AvgGain),
           upgradeCount: focus.recommended.upgradeCount
         }
       : null,
     contents: focus.entries.map((entry) => ({
       tag: entry.contentTag,
       bestGainPct: round2(entry.bestGainPct),
+      bestGain: Math.round(entry.bestGain),
       top3AvgPct: round2(entry.top3AvgPct),
+      top3AvgGain: Math.round(entry.top3AvgGain),
       upgradeCount: entry.upgradeCount
     })),
     // Meilleure pièce par emplacement, avec le boss qui la fait tomber : c'est
@@ -105,6 +109,7 @@ function serializeCharacter(
           itemId: upgrade.itemId,
           name: upgrade.itemName,
           gainPct: round2(upgrade.gainPct),
+          gain: Math.round(upgrade.gain),
           content: upgrade.contentTag,
           instance: upgrade.instance ?? '',
           boss: upgrade.boss ?? ''

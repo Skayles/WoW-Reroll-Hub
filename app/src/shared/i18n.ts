@@ -172,6 +172,7 @@ const fr: Dict = {
   'dropt.focus.best': 'meilleur : {item}',
   'dropt.focus.top3': 'moy. top 3',
   'dropt.focus.peak': 'pic +{value}%',
+  'dropt.gainDps': '+{value} dps',
   'dropt.view.bySlot': 'Meilleur par slot',
   'dropt.view.all': 'Tous les objets',
   'dropt.bySlot.title': 'Meilleure pièce par slot',
@@ -495,6 +496,7 @@ const en: Dict = {
   'dropt.focus.best': 'best: {item}',
   'dropt.focus.top3': 'top 3 avg.',
   'dropt.focus.peak': 'peak +{value}%',
+  'dropt.gainDps': '+{value} dps',
   'dropt.view.bySlot': 'Best per slot',
   'dropt.view.all': 'All items',
   'dropt.bySlot.title': 'Best piece per slot',
@@ -686,6 +688,15 @@ export function translator(lang: Lang): Translate {
     text = text.split('{s}').join(count > 1 ? 's' : '')
     return text
   }
+}
+
+/**
+ * Locale de formatage des nombres, alignée sur la langue de l'interface :
+ * un séparateur de milliers français au milieu d'une interface anglaise
+ * jurerait.
+ */
+export function numberLocale(lang: Lang): string {
+  return lang === 'en' ? 'en-GB' : 'fr-FR'
 }
 
 /** Langue par défaut déduite de la locale système, français sinon. */

@@ -48,11 +48,18 @@ export function computeFocus(
     const top3AvgPct = top3.length
       ? top3.reduce((sum, u) => sum + u.gainPct, 0) / top3.length
       : 0
+    // Moyenne calculée sur les mêmes objets que le pourcentage, pour que les
+    // deux chiffres racontent la même histoire.
+    const top3AvgGain = top3.length
+      ? top3.reduce((sum, u) => sum + u.gain, 0) / top3.length
+      : 0
 
     entries.push({
       contentTag,
       bestGainPct: upgrades[0]?.gainPct ?? 0,
+      bestGain: upgrades[0]?.gain ?? 0,
       top3AvgPct,
+      top3AvgGain,
       upgradeCount: upgrades.length,
       bestItem: upgrades[0] ?? null,
       reportIds: group.map((r) => r.reportId)
