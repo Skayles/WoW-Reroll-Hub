@@ -188,4 +188,4 @@ The addon is entirely passive. Everything it displays was written into that file
 
 ## Licence
 
-MIT.
+MIT. See [LICENSE](LICENSE).
