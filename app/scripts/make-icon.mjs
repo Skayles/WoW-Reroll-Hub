@@ -3,7 +3,10 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'resources', 'icon.ico')
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const OUT = resolve(ROOT, 'app', 'resources', 'icon.ico')
+const LOGO = resolve(ROOT, 'logo.png')
+const LOGO_SIZE = 512
 const SIZES = [16, 32, 48, 64, 128, 256]
 const SS = 4
 
@@ -198,3 +201,6 @@ mkdirSync(dirname(OUT), { recursive: true })
 writeFileSync(OUT, Buffer.concat([header, ...entries, ...images.map((i) => i.png)]))
 
 console.log(`icon.ico écrit (${SIZES.join(', ')} px) -> ${OUT}`)
+
+writeFileSync(LOGO, encodePng(render(LOGO_SIZE), LOGO_SIZE))
+console.log(`logo.png écrit (${LOGO_SIZE} px) -> ${LOGO}`)

@@ -1,3 +1,5 @@
+<img src="logo.png" alt="" width="96" align="left" hspace="14" vspace="4">
+
 # WoW Reroll Hub
 
 A desktop app and companion WoW addon to manage a whole roster **without logging into each character in game**.
