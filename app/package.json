@@ -1,0 +1,78 @@
+{
+  "name": "wow-reroll-hub",
+  "version": "0.1.0",
+  "description": "Hub multi-personnages WoW : recap stuff/stats via Battle.net, integration Droptimizer (Raidbots) et export vers l'addon RerollHelper.",
+  "main": "./out/main/index.js",
+  "author": "Skayles",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "dist": "electron-vite build && electron-builder --win --publish never",
+    "make-icon": "node scripts/make-icon.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.2",
+    "electron": "^33.0.2",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.9"
+  },
+  "build": {
+    "appId": "fr.skayles.wowrerollhub",
+    "productName": "WoW Reroll Hub",
+    "copyright": "Skayles",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../addon",
+        "to": "addon"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico",
+      "artifactName": "WoW-Reroll-Hub-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "WoW-Reroll-Hub-portable-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WoW Reroll Hub",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

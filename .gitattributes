@@ -1,0 +1,9 @@
+# Normalise les fins de ligne : LF dans le dépôt, quelle que soit la machine.
+# Sans ça, Windows enregistre du CRLF et le moindre fichier rouvert ailleurs
+# apparaît comme entièrement modifié.
+* text=auto eol=lf
+
+# Fichiers binaires : ne jamais y toucher.
+*.ico binary
+*.png binary
+*.exe binary
