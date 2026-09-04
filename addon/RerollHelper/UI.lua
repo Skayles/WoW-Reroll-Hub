@@ -11,7 +11,7 @@ local COLOR_GREEN = "|cff6fcf8a"
 local COLOR_ORANGE = "|cfff0a35e"
 local R = "|r"
 
-local frame, listChild, detail, rows, sortButtons
+local frame, listChild, detail, rows, sortButtons, contentButtons
 
 local function StyleBackdrop(target, r, g, b, a)
 	target:SetBackdrop({
@@ -162,8 +162,14 @@ local function BuildFrame()
 	detail.kpi:SetPoint("TOPLEFT", 16, -60)
 	detail.kpi:SetJustifyH("LEFT")
 
+	detail.tabPanel = CreateFrame("Frame", nil, detailPanel)
+	detail.tabPanel:SetPoint("TOPLEFT", 14, -82)
+	detail.tabPanel:SetPoint("TOPRIGHT", -14, -82)
+	detail.tabPanel:SetHeight(22)
+	contentButtons = {}
+
 	local bodyScroll = CreateFrame("ScrollFrame", "RerollHelperDetailScroll", detailPanel, "UIPanelScrollFrameTemplate")
-	bodyScroll:SetPoint("TOPLEFT", 12, -86)
+	bodyScroll:SetPoint("TOPLEFT", 12, -110)
 	bodyScroll:SetPoint("BOTTOMRIGHT", -28, 10)
 
 	local bodyChild = CreateFrame("Frame", nil, bodyScroll)
@@ -276,9 +282,10 @@ local function BuildDetailText(character)
 	end
 	add("")
 
-	if character.bySlot and #character.bySlot > 0 then
+	local slots = RH:GetSlotsForTab(character, RH.db.contentTab)
+	if slots and #slots > 0 then
 		add(COLOR_ACCENT .. L.bySlotHeader .. R)
-		for _, slot in ipairs(character.bySlot) do
+		for _, slot in ipairs(slots) do
 			local extra = ""
 			if slot.candidates and slot.candidates > #slot.items then
 				extra = ("  %s%s%s"):format(COLOR_FAINT, L.bySlotMore:format(slot.candidates), R)
@@ -303,8 +310,12 @@ local function BuildDetailText(character)
 					gain and (" (" .. gain .. ")") or "",
 					R
 				))
-				local origin = RH:ContentName(item.category, item.difficulty)
-				add(("         %s%s · %s%s"):format(COLOR_FAINT, source, origin, R))
+				if RH.db.contentTab == "TOTAL" then
+					local origin = RH:ContentName(item.category, item.difficulty)
+					add(("         %s%s · %s%s"):format(COLOR_FAINT, source, origin, R))
+				else
+					add(("         %s%s%s"):format(COLOR_FAINT, source, R))
+				end
 			end
 		end
 		add("")
@@ -351,8 +362,69 @@ local function BuildDetailText(character)
 	return table.concat(lines, "\n")
 end
 
+local function CreateContentButton(index)
+	local button = CreateFrame("Button", nil, detail.tabPanel, "BackdropTemplate")
+	button:SetHeight(20)
+	StyleBackdrop(button, 0.11, 0.13, 0.17, 1)
+
+	button.text = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	button.text:SetPoint("CENTER")
+
+	button:SetScript("OnClick", function(self)
+		RH.db.contentTab = self.tabKey
+		RH:Refresh()
+	end)
+
+	contentButtons[index] = button
+	return button
+end
+
+local function RenderContentTabs(character)
+	local tabs = { { key = "TOTAL", label = RH.L.tabTotal } }
+	for _, content in ipairs(character and character.contents or {}) do
+		tabs[#tabs + 1] = {
+			key = RH:ContentTabKey(content.category, content.difficulty),
+			label = RH:ContentName(content.category, content.difficulty),
+		}
+	end
+
+	local known = false
+	for _, tab in ipairs(tabs) do
+		if tab.key == RH.db.contentTab then
+			known = true
+			break
+		end
+	end
+	if not known then
+		RH.db.contentTab = "TOTAL"
+	end
+
+	local offset = 0
+	for index, tab in ipairs(tabs) do
+		local button = contentButtons[index] or CreateContentButton(index)
+		button.tabKey = tab.key
+		button.text:SetText(tab.label)
+
+		local width = button.text:GetStringWidth() + 18
+		button:SetWidth(width)
+		button:ClearAllPoints()
+		button:SetPoint("TOPLEFT", offset, 0)
+		offset = offset + width + 4
+
+		local active = tab.key == RH.db.contentTab
+		button:SetBackdropBorderColor(active and 0.35 or 0.15, active and 0.78 or 0.18, active and 0.98 or 0.23, 1)
+		button:SetBackdropColor(active and 0.16 or 0.09, active and 0.20 or 0.11, active and 0.26 or 0.14, 1)
+		button:Show()
+	end
+
+	for index = #tabs + 1, #contentButtons do
+		contentButtons[index]:Hide()
+	end
+end
+
 local function RenderDetail()
 	local character = RH.db.selected and FindCharacter(RH.db.selected) or nil
+	RenderContentTabs(character)
 
 	if not character then
 		detail.name:SetText("")

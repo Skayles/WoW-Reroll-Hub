@@ -1,7 +1,7 @@
 local ADDON_NAME, RH = ...
 _G.RerollHelper = RH
 
-RH.SCHEMA = 2
+RH.SCHEMA = 4
 RH.VERSION = C_AddOns and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "0.1.0"
 
 function RH:GetExport()
@@ -121,6 +121,28 @@ function RH:GetSortedCharacters(sortKey)
 	return list
 end
 
+function RH:ContentTabKey(category, difficulty)
+	if category == "RAID" and difficulty and difficulty ~= "" then
+		return category .. ":" .. difficulty
+	end
+	return category
+end
+
+function RH:GetSlotsForTab(character, tab)
+	if not character then
+		return nil
+	end
+	if not tab or tab == "TOTAL" then
+		return character.bySlot
+	end
+	for _, content in ipairs(character.contents or {}) do
+		if self:ContentTabKey(content.category, content.difficulty) == tab then
+			return content.bySlot
+		end
+	end
+	return nil
+end
+
 function RH:GetBestIlvl()
 	local best = 0
 	for _, character in ipairs(self:GetSortedCharacters("ilvl")) do
@@ -134,6 +156,7 @@ end
 local DEFAULTS = {
 	sort = "ilvl",
 	selected = nil,
+	contentTab = "TOTAL",
 	point = { "CENTER", nil, "CENTER", 0, 0 },
 	minimap = { hide = false },
 }

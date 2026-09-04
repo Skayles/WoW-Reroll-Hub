@@ -18,7 +18,11 @@ import {
   type RaidDifficulty
 } from './content'
 
-export type TaggedUpgrade = DroptimizerUpgrade & { labelKey: string }
+export type TaggedUpgrade = DroptimizerUpgrade & {
+  category: ContentCategory
+  difficulty: RaidDifficulty | null
+  labelKey: string
+}
 
 export function computeFocus(
   character: CharacterDetail,
@@ -107,7 +111,12 @@ export function computeBySlot(reports: DroptimizerReport[]): SlotUpgrades[] {
     const labelKey = contentLabelKey(report.category, report.difficulty)
     for (const upgrade of report.upgrades) {
       if (upgrade.gainPct <= 0) continue
-      const tagged: TaggedUpgrade = { ...upgrade, labelKey }
+      const tagged: TaggedUpgrade = {
+        ...upgrade,
+        category: report.category,
+        difficulty: report.difficulty,
+        labelKey
+      }
 
       if (!upgrade.itemId) {
         unidentified.push(tagged)

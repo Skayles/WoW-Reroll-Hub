@@ -4,7 +4,8 @@ import path from 'node:path'
 import type { CharacterDetail, ExportResult } from '@shared/types'
 import { EXPORT_SCHEMA_VERSION } from '@shared/types'
 import { ADDON_NAME } from '@shared/constants'
-import { computeFocus, findWeakSlots } from '@shared/focus'
+import { computeBySlot, computeFocus, findWeakSlots, reportsFor } from '@shared/focus'
+import type { SlotUpgrades } from '@shared/types'
 import { toLua } from './lua'
 import { store } from './store'
 import { t } from './i18n'
@@ -92,27 +93,18 @@ function serializeCharacter(
       bestGain: Math.round(entry.bestGain),
       top3AvgPct: round2(entry.top3AvgPct),
       top3AvgGain: Math.round(entry.top3AvgGain),
-      upgradeCount: entry.upgradeCount
+      upgradeCount: entry.upgradeCount,
+      bySlot: serializeSlots(
+        computeBySlot(
+          reportsFor(reports, character.id, {
+            category: entry.category,
+            difficulty: entry.difficulty
+          })
+        )
+      )
     })),
 
-    bySlot: focus.bySlot
-      .filter((slot) => slot.upgrades.length > 0)
-      .map((slot) => ({
-        slot: slot.slotGroup,
-        candidates: slot.candidateCount,
-        items: slot.upgrades.map((upgrade) => ({
-          itemId: upgrade.itemId,
-          name: upgrade.itemName,
-          gainPct: round2(upgrade.gainPct),
-          gain: Math.round(upgrade.gain),
-          category: upgrade.labelKey.startsWith('content.RAID.') ? 'RAID' : upgrade.labelKey.replace('content.', ''),
-          difficulty: upgrade.labelKey.startsWith('content.RAID.')
-            ? upgrade.labelKey.replace('content.RAID.', '')
-            : '',
-          instance: upgrade.instance ?? '',
-          boss: upgrade.boss ?? ''
-        }))
-      })),
+    bySlot: serializeSlots(focus.bySlot),
 
     issues: focus.gearIssues.map((issue) => ({
       type: issue.type,
@@ -130,6 +122,25 @@ function serializeCharacter(
       total: r.total
     }))
   }
+}
+
+function serializeSlots(slots: SlotUpgrades[]): Record<string, unknown>[] {
+  return slots
+    .filter((slot) => slot.upgrades.length > 0)
+    .map((slot) => ({
+      slot: slot.slotGroup,
+      candidates: slot.candidateCount,
+      items: slot.upgrades.map((upgrade) => ({
+        itemId: upgrade.itemId,
+        name: upgrade.itemName,
+        gainPct: round2(upgrade.gainPct),
+        gain: Math.round(upgrade.gain),
+        category: upgrade.category,
+        difficulty: upgrade.difficulty ?? '',
+        instance: upgrade.instance ?? '',
+        boss: upgrade.boss ?? ''
+      }))
+    }))
 }
 
 function round2(value: number): number {

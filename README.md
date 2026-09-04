@@ -147,7 +147,9 @@ Automatic export after each sync is on by default (can be turned off in Settings
 | `/rh status` | State and date of the exported data |
 | `/rh help` | Help |
 
-The window lists every character (sortable by ilvl, M+ score, focus, name) and, for the selected one, shows: the content to focus, the best piece per slot with the boss that drops it, missing enchants and empty sockets, lagging slots, raid progress and your note.
+The window lists every character (sortable by ilvl, M+ score, focus, name) and, for the selected one, shows: the content ranking, missing enchants and empty sockets, lagging slots, raid progress and your note.
+
+The detail panel carries the same **content tabs** as the app — Total plus one tab per content the character has a report for. Switching tabs swaps the best-piece-per-slot list, so you can check what Heroic raid gives you separately from Mythic+. On Total, each item also shows which content it comes from.
 
 ---
 

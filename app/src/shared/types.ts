@@ -2,7 +2,7 @@ import type { Lang } from './i18n'
 import type { SlotGroup } from './slots'
 import type { ContentCategory, RaidDifficulty } from './content'
 
-export const EXPORT_SCHEMA_VERSION = 3
+export const EXPORT_SCHEMA_VERSION = 4
 
 export type Region = 'eu' | 'us' | 'kr' | 'tw'
 
@@ -185,7 +185,11 @@ export interface FocusEntry {
 export interface SlotUpgrades {
   slotGroup: SlotGroup
 
-  upgrades: (DroptimizerUpgrade & { labelKey: string })[]
+  upgrades: (DroptimizerUpgrade & {
+    category: ContentCategory
+    difficulty: RaidDifficulty | null
+    labelKey: string
+  })[]
 
   candidateCount: number
 }
