@@ -129,7 +129,7 @@ La fenêtre liste tous les persos (triables par ilvl, score M+, focus, nom) et a
 **Limites connues :**
 - L'API Blizzard reflète l'état du perso à sa **dernière déconnexion**, pas en temps réel. Un perso jamais connecté depuis une refonte majeure peut renvoyer un profil incomplet.
 - Le jeton Battle.net dure 24 h ; il faut se reconnecter ensuite (un clic).
-- L'addon cible l'interface `110200`. Si WoW le signale comme obsolète après un patch, mets à jour la ligne `## Interface:` de `addon/RerollHelper/RerollHelper.toc`.
+- L'addon cible l'interface `120100` (patch 12.1.0). À chaque patch majeur, mets à jour la ligne `## Interface:` de `addon/RerollHelper/RerollHelper.toc` : le numéro se lit `XXYYZZ` (extension, mineure, correctif), et se vérifie en jeu avec `/dump select(4, GetBuildInfo())`.
 - Le sens app → addon est le seul implémenté. Remonter des données du jeu vers l'app demanderait de lire les `SavedVariables`, ce qui n'est pas nécessaire ici puisque l'API Blizzard fournit déjà tout.
 
 **Où sont stockées les données ?** Dans `%APPDATA%/wow-reroll-hub/` : `settings.json`, `data.json` (persos et rapports), `item-cache.json`, `token.bin` (chiffré).
