@@ -1,11 +1,3 @@
---[[
-  Reroll Helper — localisation
-
-  La langue suit en priorité celle choisie dans l'application (champ `lang` de
-  l'export) : c'est un choix explicite de l'utilisateur, il doit primer sur la
-  langue du client WoW. À défaut, on retombe sur GetLocale(), puis sur l'anglais.
-]]
-
 local _, RH = ...
 
 local translations = {}
@@ -32,6 +24,13 @@ translations.en = {
 	focusPeak = "peak %s · %d items",
 	gainDps = "+%s dps",
 	bySlotHeader = "Best piece per slot",
+	contentRAID = "Raid",
+	contentRAID_NORMAL = "Normal raid",
+	contentRAID_HEROIC = "Heroic raid",
+	contentRAID_MYTHIC = "Mythic raid",
+	contentMYTHIC_PLUS = "Mythic+",
+	contentBONUS_ROLL = "Bonus rolls",
+	contentOTHER = "Other",
 	bySlotMore = "%d candidates",
 	sourceUnknown = "unknown source",
 	issuesHeader = "To fix",
@@ -43,6 +42,7 @@ translations.en = {
 	helpHeader = "commands:",
 	helpToggle = "  /rh          open or close the window",
 	helpStatus = "  /rh status   state of the exported data",
+	disclaimer = "Built with AI assistance, under human review. This addon only displays a file written by the WoW Reroll Hub app: it collects nothing and sends nothing.",
 
 	roleTANK = "Tank",
 	roleHEALER = "Healer",
@@ -112,6 +112,13 @@ translations.fr = {
 	focusPeak = "pic %s · %d objets",
 	gainDps = "+%s dps",
 	bySlotHeader = "Meilleure pièce par slot",
+	contentRAID = "Raid",
+	contentRAID_NORMAL = "Raid normal",
+	contentRAID_HEROIC = "Raid héroïque",
+	contentRAID_MYTHIC = "Raid mythique",
+	contentMYTHIC_PLUS = "Mythique+",
+	contentBONUS_ROLL = "Bonus rolls",
+	contentOTHER = "Autre",
 	bySlotMore = "%d candidats",
 	sourceUnknown = "source inconnue",
 	issuesHeader = "À corriger",
@@ -123,6 +130,7 @@ translations.fr = {
 	helpHeader = "commandes :",
 	helpToggle = "  /rh          ouvre ou ferme la fenêtre",
 	helpStatus = "  /rh status   état des données exportées",
+	disclaimer = "Réalisé avec l'aide de l'IA, sous relecture humaine. Cet addon se contente d'afficher un fichier écrit par l'application WoW Reroll Hub : il ne collecte rien et n'envoie rien.",
 
 	roleTANK = "Tank",
 	roleHEALER = "Soigneur",
@@ -170,23 +178,18 @@ translations.fr = {
 	groupOTHER = "Autre",
 }
 
---- Renvoie la table de traduction à utiliser.
 local function resolve()
 	local exported = _G.RerollHelperData and _G.RerollHelperData.lang
 	if exported and translations[exported] then
 		return translations[exported]
 	end
 
-	-- Repli sur la langue du client : frFR seul est traduit, tout le reste
-	-- (deDE, esES, ruRU...) est mieux servi en anglais qu'en français.
 	if GetLocale() == "frFR" then
 		return translations.fr
 	end
 	return translations.en
 end
 
---- Métatable : une clé absente renvoie la clé elle-même plutôt que nil,
---- ce qui évite un crash de string.format sur une traduction oubliée.
 local fallback = {
 	__index = function(_, key)
 		return translations.en[key] or key
@@ -198,8 +201,6 @@ function RH:LoadLocale()
 	return self.L
 end
 
---- Gain de dps absolu, avec séparateurs de milliers.
---- BreakUpLargeNumbers suit la locale du client ; repli brut si absent.
 function RH:FormatGain(value)
 	if not value or value == 0 then
 		return nil
@@ -209,7 +210,16 @@ function RH:FormatGain(value)
 	return self.L.gainDps:format(text)
 end
 
---- Nom lisible d'un slot d'équipement (HEAD, FINGER_1...).
+function RH:ContentName(category, difficulty)
+	if not category or category == "" then
+		return "?"
+	end
+	if category == "RAID" and difficulty and difficulty ~= "" then
+		return self.L["contentRAID_" .. difficulty]
+	end
+	return self.L["content" .. category]
+end
+
 function RH:SlotName(slot)
 	if not slot or slot == "" then
 		return "?"
@@ -217,7 +227,6 @@ function RH:SlotName(slot)
 	return self.L["slot" .. slot]
 end
 
---- Nom lisible d'un groupe d'emplacements (FINGER, TRINKET, WEAPON...).
 function RH:GroupName(group)
 	if not group or group == "" then
 		return "?"
@@ -225,7 +234,6 @@ function RH:GroupName(group)
 	return self.L["group" .. group]
 end
 
---- Met en phrase un problème d'équipement décrit de façon structurée.
 function RH:IssueText(issue)
 	if issue.type == "enchant" then
 		return self.L.issueEnchant:format(self:SlotName(issue.slot))

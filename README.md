@@ -1,163 +1,189 @@
 # WoW Reroll Hub
 
-Application de bureau + addon WoW pour piloter un roster multi-personnages **sans avoir à se connecter en jeu sur chaque perso**.
+A desktop app and companion WoW addon to manage a whole roster **without logging into each character in game**.
 
-- L'**application** se connecte à ton compte Battle.net (comme Raider.IO), récupère la liste complète de tes personnages et, pour chacun, l'équipement, les statistiques, le score Mythique+, la progression raid et les métiers.
-- Tu y colles tes rapports **Droptimizer** de Raidbots : l'app classe tes contenus (raid HM, raid mythique, donjons…) par potentiel de gain et te dit lequel focus sur ce perso.
-- L'**addon** `RerollHelper` reçoit ce récap et l'affiche en jeu via `/rh`.
+- The **app** connects to your Battle.net account (the same way Raider.IO does), pulls every character you own and, for each one, its gear, stats, Mythic+ rating, raid progress and professions.
+- You paste your **Droptimizer** reports from Raidbots into it. The app ranks your content (heroic raid, mythic raid, Mythic+…) by upgrade potential and tells you what to farm first on that character.
+- The **addon** `RerollHelper` receives that summary and shows it in game with `/rh`.
 
-L'application et l'addon sont disponibles en **français et en anglais** (*Réglages → Langue de l'application*, l'addon suit ce choix au prochain export).
+Both the app and the addon ship in **English and French** (*Settings → Application language*; the addon follows that choice on the next export).
+
+> ### AI disclosure
+>
+> This project was written with substantial help from an AI assistant (Claude), under human direction and review. Every feature was tested before release, but you should know how it was built before installing it. The addon reads a single generated Lua file and never sends anything anywhere — see [What the addon does](#what-the-addon-does-and-does-not-do) below.
 
 ```
 Projet app reroll wow/
-├─ app/                     Application Electron + React + TypeScript
+├─ app/                     Electron + React + TypeScript app
 │  └─ src/
-│     ├─ main/              Process principal : OAuth, API Blizzard, export
-│     ├─ preload/           Pont IPC sécurisé
-│     ├─ renderer/          Interface React
-│     └─ shared/            Types et logique partagés app ↔ export
-└─ addon/RerollHelper/      Addon Lua installé dans Interface/AddOns
+│     ├─ main/              Main process: OAuth, Blizzard API, export
+│     ├─ preload/           Sandboxed IPC bridge
+│     ├─ renderer/          React UI
+│     └─ shared/            Types and logic shared by app and export
+└─ addon/RerollHelper/      Lua addon installed into Interface/AddOns
 ```
 
 ---
 
-## 1. Lancer l'application
+## 1. Run the app
 
 ```bash
 cd app
 npm install
-npm run dev          # développement, rechargement à chaud
+npm run dev          # development, hot reload
 ```
 
-## 1 bis. Créer l'exécutable (pour ne plus passer par le terminal)
+## 2. Build an executable
 
 ```bash
 cd app
 npm run dist
 ```
 
-Deux fichiers apparaissent dans `app/release/` :
+Two files land in `app/release/`:
 
-| Fichier | Usage |
+| File | Use |
 | --- | --- |
-| `WoW-Reroll-Hub-Setup-0.1.0.exe` | **Installeur.** Il installe l'app pour ton utilisateur (pas besoin d'être administrateur), crée un raccourci sur le bureau et une entrée dans le menu Démarrer, et s'ajoute à « Applications et fonctionnalités » pour la désinstallation. |
-| `WoW-Reroll-Hub-portable-0.1.0.exe` | **Portable.** Un seul fichier, aucune installation : tu le poses où tu veux (clé USB comprise) et tu double-cliques. |
+| `WoW-Reroll-Hub-Setup-0.1.0.exe` | **Installer.** Installs for the current user (no admin rights needed), creates a desktop shortcut and a Start menu entry, and registers in "Apps & features" for uninstalling. |
+| `WoW-Reroll-Hub-portable-0.1.0.exe` | **Portable.** A single file, no installation: drop it anywhere (USB stick included) and double-click. |
 
-Les deux embarquent l'addon : l'export fonctionne sans garder le dossier du projet.
+Both bundle the addon, so exporting works without keeping the project folder around.
 
-Tes réglages et tes données restent dans `%APPDATA%/wow-reroll-hub/`, donc une réinstallation ou une mise à jour ne te fait pas repartir de zéro — et la désinstallation ne les efface pas.
+Your settings and data live in `%APPDATA%/wow-reroll-hub/`, outside the install folder — reinstalling or updating never sends you back to square one, and uninstalling does not delete them.
 
-> **Avertissement Windows au premier lancement.** L'exécutable n'est pas signé numériquement (une signature de code coûte plusieurs centaines d'euros par an). SmartScreen affichera donc « Windows a protégé votre ordinateur » : clique sur *Informations complémentaires* puis *Exécuter quand même*. C'est le comportement normal de tout logiciel non signé.
+> **Windows warning on first launch.** The executable is not code-signed (a certificate costs several hundred euros a year). SmartScreen will show "Windows protected your PC": click *More info* then *Run anyway*. This is the normal behaviour for any unsigned software.
 
-L'icône est générée par script, sans dépendance graphique :
+The icon is generated by a script, with no graphics dependency:
 
 ```bash
-npm run make-icon    # régénère app/resources/icon.ico
+npm run make-icon    # regenerates app/resources/icon.ico
 ```
 
-## 2. Créer ses identifiants Battle.net (une seule fois)
+## 3. Create your Battle.net credentials (once)
 
-L'API Blizzard exige un client OAuth. Il est gratuit et se crée en une minute — c'est exactement le mécanisme que Raider.IO utilise, à ceci près qu'ici le client t'appartient et que rien ne transite par un serveur tiers.
+The Blizzard API requires an OAuth client. It is free and takes a minute — the same mechanism Raider.IO uses, except here the client is yours and nothing goes through a third-party server.
 
-1. Ouvre <https://develop.battle.net/access/clients> et connecte-toi.
-2. **Create Client**. Nom libre (ex. « Reroll Hub »).
-3. Dans **Redirect URLs**, colle exactement : `http://localhost:8710/callback`
-4. Laisse le reste par défaut, valide.
-5. Copie le **Client ID** et le **Client Secret** dans l'onglet *Réglages* de l'application.
-6. Clique **Se connecter avec Battle.net** : l'autorisation s'ouvre dans ton navigateur, tu acceptes, l'app récupère la session.
+1. Open <https://develop.battle.net/access/clients> and sign in.
+2. **Create Client**. Any name will do (e.g. "Reroll Hub").
+3. Under **Redirect URLs**, paste exactly: `http://localhost:8710/callback`
+4. Leave everything else at its default and save.
+5. Copy the **Client ID** and **Client Secret** into the app's *Settings* tab.
+6. Click **Sign in with Battle.net**: authorization opens in your browser, you accept, and the app picks up the session.
 
-Le secret est chiffré au repos avec DPAPI (Windows) et n'est transmis qu'à Blizzard.
+The secret is encrypted at rest with DPAPI (Windows) and is only ever sent to Blizzard.
 
-> **Portée demandée :** `wow.profile` uniquement — lecture seule des personnages du compte. Aucune action n'est possible sur ton compte.
+> **Scope requested:** `wow.profile` only — read-only access to the characters on the account. No action can be taken on your account.
 
-## 3. Synchroniser
+## 4. Sync
 
-Bouton **Synchroniser le compte** en bas de la liste. L'app interroge :
+Hit **Sync account** at the bottom of the list. The app queries:
 
-| Donnée | Endpoint Blizzard |
+| Data | Blizzard endpoint |
 | --- | --- |
-| Liste de tous les persos du compte | `/profile/user/wow` |
-| Résumé (ilvl, spé, guilde, faction) | `/profile/wow/character/{royaume}/{nom}` |
-| Équipement, enchantements, châsses, tier | `…/equipment` |
-| Statistiques secondaires | `…/statistics` |
-| Score et clés Mythique+ | `…/mythic-keystone-profile` |
-| Progression raid | `…/encounters/raids` |
-| Métiers | `…/professions` |
-| Objet → boss qui le fait tomber | `/data/wow/journal-instance`, `/data/wow/journal-encounter` |
+| Every character on the account | `/profile/user/wow` |
+| Summary (ilvl, spec, guild, faction) | `/profile/wow/character/{realm}/{name}` |
+| Gear, enchants, sockets, tier | `…/equipment` |
+| Secondary stats | `…/statistics` |
+| Mythic+ rating and runs | `…/mythic-keystone-profile` |
+| Raid progress | `…/encounters/raids` |
+| Professions | `…/professions` |
+| Item → boss that drops it | `/data/wow/journal-instance`, `/data/wow/journal-encounter` |
 
-Un perso en échec (renommé, transféré, supprimé) n'interrompt pas la synchro : il est signalé et les autres passent quand même.
+A character that fails (renamed, transferred, deleted) does not abort the sync: it is reported and the others go through anyway.
 
-Le niveau minimum est réglable pour ne pas synchroniser les persos-banque.
+The minimum level is configurable so you do not sync forty bank alts.
 
-## 4. Importer un Droptimizer
+## 5. Import a Droptimizer
 
-Dans la fiche d'un perso, section **Droptimizer** :
+On a character sheet, in the **Droptimizer** section:
 
-1. Lance une simulation **Droptimizer** sur <https://www.raidbots.com/simbot/droptimizer> depuis le jeu (`/simc`), une par contenu que tu veux comparer (raid héroïque, raid mythique, donjons…).
-2. Colle le lien du rapport (`https://www.raidbots.com/simbot/report/XXXX`) dans le champ, puis **Importer**.
-3. Renomme l'étiquette de contenu si besoin — deux rapports partageant la même étiquette sont regroupés dans une seule priorité.
+1. Run a **Droptimizer** sim on <https://www.raidbots.com/simbot/droptimizer> from the game (`/simc`), one per content you want to compare.
+2. Pick the matching tab (**Raid** with its difficulty, **Mythic+**, **Bonus rolls**), paste the report link, then **Import**.
+3. On the **Total** tab, the category is guessed from the report title instead. You can always change it afterwards with the dropdowns on the report.
 
-Le classement affiché trie les contenus sur la **moyenne des trois meilleurs gains**, pas sur le pic : un contenu qui lâche cinq objets à +4 % vaut mieux qu'un contenu avec un seul objet à +8 %.
+### Content tabs
 
-### Meilleure pièce par slot
+Each tab holds **one report per content**. Importing a new Mythic+ sim replaces the previous Mythic+ one, and leaves your raid sims untouched — so you can build up Raid Normal / Heroic / Mythic, Mythic+ and Bonus rolls side by side.
 
-Sous le classement, la vue **Meilleur par slot** ne garde qu'une ligne par emplacement — deux pour les anneaux et les bijoux, puisque deux s'équipent. Un droptimizer renvoie facilement dix colliers concurrents alors qu'un seul se porte : la question utile est « quelle pièce viser pour ce slot », pas « quels sont les dix meilleurs objets ». Le compteur à droite du nom du slot indique combien d'objets étaient en lice.
+Raid splits into Normal / Heroic / Mythic. LFR is deliberately absent.
 
-L'onglet **Tous les objets** conserve la liste complète, rapport par rapport.
+A green dot on a tab means it already holds a report.
 
-### D'où tombe chaque objet
+### Content ranking
 
-Chaque amélioration affiche son gain en **pourcentage et en dps absolu**, ainsi que le **boss et le donjon/raid** qui la font tomber. Le pourcentage reste la lecture principale — c'est lui qui se compare d'un personnage à l'autre — mais le dps donne l'ordre de grandeur réel du gain. L'association vient du journal des aventures de Blizzard (`/data/wow/journal-*`), la seule source officielle qui relie un identifiant d'objet à sa rencontre.
+The ranking sorts content by the **average of the three best upgrades**, not by the single best one: content that drops five items worth +4 % beats content with one item at +8 %.
 
-L'index est construit automatiquement au premier import, puis mis en cache. Il couvre les deux dernières extensions. S'il manque des sources, *Réglages → Index du butin → Reconstruire l'index*.
+### Best piece per slot
 
-**Si le rapport a expiré** (Raidbots purge les rapports gratuits au bout d'un mois) : bascule le champ en mode **JSON** et colle le contenu du `data.json` du rapport, que tu peux télécharger depuis la page Raidbots tant qu'elle est vivante.
+The **Best per slot** view keeps one row per equipment slot — two for rings and trinkets, since you wear two of each. A droptimizer easily returns ten competing necks when only one can be worn: the useful question is "what should I aim for in this slot", not "what are the ten best items". The counter next to the slot name shows how many items were in the running.
 
-Les objets sont identifiés par leur item ID puis résolus via l'API Blizzard (nom et slot), avec un cache local — le format interne de Raidbots peut changer sans casser l'import.
+The **All items** view keeps the full list, report by report.
 
-## 5. Exporter vers l'addon
+### Where each item drops
 
-Onglet **Export addon** :
+Every upgrade shows its gain both as a **percentage and in absolute dps**, along with the **boss and dungeon/raid** it drops from. The percentage stays the primary reading — it is what compares across characters — while the dps gives the real magnitude.
 
-1. Ferme WoW (ou prévois un `/reload` : le jeu ne relit les fichiers Lua qu'au chargement).
-2. **Exporter maintenant**. L'app copie l'addon dans `…/_retail_/Interface/AddOns/RerollHelper/` et y écrit `Data/Export.lua`.
-3. En jeu, active *Reroll Helper* dans la liste des addons, puis `/rh`.
+Boss data comes from Blizzard's adventure journal (`/data/wow/journal-*`), the only official source linking an item id to its encounter. The index is built automatically on the first import and cached, covering the last two expansions. If sources are missing, use *Settings → Loot index → Rebuild index*.
 
-L'export automatique après chaque synchro est activé par défaut (désactivable dans les Réglages).
+**If a report has expired** (Raidbots purges free reports after a month): switch the field to **JSON** mode and paste the report's `data.json`, which you can download from the Raidbots page while it is still alive.
 
-### Commandes de l'addon
+Item names are resolved through the Blizzard API and cached per language. Changing the data language refreshes the labels of every stored report automatically.
 
-| Commande | Effet |
+## 6. Export to the addon
+
+In the **Addon export** tab:
+
+1. Close WoW (or plan a `/reload`: the game only reads addon files on load).
+2. **Export now**. The app copies the addon into `…/_retail_/Interface/AddOns/RerollHelper/` and writes `Data/Export.lua`.
+3. In game, enable *Reroll Helper* in the addon list, then `/rh`.
+
+Automatic export after each sync is on by default (can be turned off in Settings).
+
+### Addon commands
+
+| Command | Effect |
 | --- | --- |
-| `/rh` | Ouvre/ferme la fenêtre |
-| `/rh status` | État et date des données exportées |
-| `/rh help` | Aide |
+| `/rh` | Open / close the window |
+| `/rh status` | State and date of the exported data |
+| `/rh help` | Help |
 
-La fenêtre liste tous les persos (triables par ilvl, score M+, focus, nom) et affiche pour le perso sélectionné : le contenu à focus, la meilleure pièce par slot avec le boss qui la fait tomber, les enchantements et châsses manquants, les slots en retard, la progression raid et ta note.
-
-L'addon suit la langue choisie dans l'application. À défaut d'export, il utilise celle du client WoW (français, anglais sinon).
+The window lists every character (sortable by ilvl, M+ score, focus, name) and, for the selected one, shows: the content to focus, the best piece per slot with the boss that drops it, missing enchants and empty sockets, lagging slots, raid progress and your note.
 
 ---
 
-## Notes techniques
+## What the addon does and does not do
 
-**Pourquoi une app de bureau et pas un site ?** Écrire dans `Interface/AddOns` demande un accès disque. Un addon ne peut pas non plus lire le réseau : la seule passerelle app → jeu est un fichier Lua chargé au démarrage. C'est la méthode utilisée par les outils du même genre.
+**It does:** read one generated Lua file (`Data/Export.lua`) and draw a window. That is all.
 
-**Limites connues :**
-- L'API Blizzard reflète l'état du perso à sa **dernière déconnexion**, pas en temps réel. Un perso jamais connecté depuis une refonte majeure peut renvoyer un profil incomplet.
-- Le jeton Battle.net dure 24 h ; il faut se reconnecter ensuite (un clic).
-- L'addon cible l'interface `120100` (patch 12.1.0). À chaque patch majeur, mets à jour la ligne `## Interface:` de `addon/RerollHelper/RerollHelper.toc` : le numéro se lit `XXYYZZ` (extension, mineure, correctif), et se vérifie en jeu avec `/dump select(4, GetBuildInfo())`.
-- Le sens app → addon est le seul implémenté. Remonter des données du jeu vers l'app demanderait de lire les `SavedVariables`, ce qui n'est pas nécessaire ici puisque l'API Blizzard fournit déjà tout.
+**It does not:** collect anything from your game, send anything over the network (addons cannot), modify your gear or settings, or interact with the game world in any way. Its only saved variable stores your window position and sort preference.
 
-**Où sont stockées les données ?** Dans `%APPDATA%/wow-reroll-hub/` : `settings.json`, `data.json` (persos et rapports), `item-cache.json`, `token.bin` (chiffré).
+The addon is entirely passive. Everything it displays was written into that file by the desktop app.
 
-## Dépannage
+## Technical notes
 
-| Symptôme | Cause / solution |
+**Why a desktop app rather than a website?** Writing into `Interface/AddOns` needs disk access. An addon also cannot read the network: the only bridge from app to game is a Lua file loaded at startup. This is the approach every tool of this kind uses.
+
+**Known limits:**
+- The Blizzard API reflects a character's state at its **last logout**, not in real time. A character that has not logged in since a major revamp can return an incomplete profile.
+- The Battle.net token lasts 24 hours; you then sign in again (one click).
+- The addon targets interface `120100` (patch 12.1.0). After each major patch, update the `## Interface:` line in `addon/RerollHelper/RerollHelper.toc`: the number reads `XXYYZZ` (expansion, minor, patch), and can be checked in game with `/dump select(4, GetBuildInfo())`.
+- Only the app → addon direction is implemented. Sending game data back would mean reading `SavedVariables`, which is unnecessary here since the Blizzard API already provides everything.
+- Raidbots does not publicly document its `data.json` format, and it has changed before. The parser is deliberately tolerant: it extracts item ids heuristically, then resolves them through the Blizzard API, which is stable.
+
+**Where is the data stored?** In `%APPDATA%/wow-reroll-hub/`: `settings.json`, `data.json` (characters and reports), `item-cache-v2.json`, `journal-cache.json`, `token.bin` (encrypted).
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
 | --- | --- |
-| `Error: Electron uninstall` au lancement | Le binaire Electron n'a pas été téléchargé pendant `npm install`. Lance `node node_modules/electron/install.js` depuis `app/`. |
-| `Cannot read properties of undefined (reading 'requestSingleInstanceLock')` | La variable d'environnement `ELECTRON_RUN_AS_NODE` est définie (certains terminaux intégrés d'éditeurs la posent) : Electron démarre alors comme un simple Node. Lance l'app depuis un terminal normal. |
-| `Le port 8710 est déjà utilisé` | Change le port dans *Réglages*, et reporte la nouvelle URL dans les Redirect URLs sur develop.battle.net. |
-| `Échange du code refusé (400)` | La Redirect URL enregistrée sur develop.battle.net ne correspond pas exactement à celle affichée dans *Réglages* (le `/callback` final compte). |
-| `Accès refusé au dossier AddOns` | WoW est ouvert et verrouille le dossier : ferme le jeu puis relance l'export. |
-| L'addon dit « Aucune donnée exportée » | L'export a écrit ailleurs (mauvaise saveur de jeu) ou WoW n'a pas rechargé : vérifie le chemin dans *Réglages* puis fais `/reload`. |
+| `Error: Electron uninstall` on launch | The Electron binary was not downloaded during `npm install`. Run `node node_modules/electron/install.js` from `app/`. |
+| `Cannot read properties of undefined (reading 'requestSingleInstanceLock')` | The `ELECTRON_RUN_AS_NODE` environment variable is set (some editors' integrated terminals set it), so Electron starts as plain Node. Launch the app from a normal terminal. |
+| `Port 8710 is already in use` | Change the port in *Settings*, and update the Redirect URL on develop.battle.net to match. |
+| `Code exchange refused (400)` | The Redirect URL registered on develop.battle.net does not match the one shown in *Settings* exactly (the trailing `/callback` counts). |
+| `Access denied to the AddOns folder` | WoW is open and locking the folder: close the game, then export again. |
+| The addon says "No data exported yet" | The export went elsewhere (wrong game flavour) or WoW has not reloaded: check the path in *Settings*, then `/reload`. |
+| Item names stay in the previous language | Use *Settings → Refresh names*, or switch the data language, which triggers it automatically. |
+
+## Licence
+
+MIT.

@@ -15,11 +15,6 @@ import { t } from './i18n'
 import { apiGet, getAccountProfile, localized, type AccountCharacter } from './blizzard'
 import { store } from './store'
 
-/**
- * Rôles par identifiant de spécialisation. Les IDs de spé sont stables côté
- * Blizzard ; c'est bien moins coûteux que d'interroger
- * /data/wow/playable-specialization pour chaque perso.
- */
 const TANK_SPECS = new Set([250, 581, 104, 268, 66, 73])
 const HEALER_SPECS = new Set([105, 270, 65, 256, 257, 264, 1468])
 
@@ -33,10 +28,6 @@ function roleForSpec(specId: number | undefined): CharacterDetail['role'] {
 export function characterId(region: Region, realmSlug: string, name: string): string {
   return `${region}:${realmSlug}:${name.toLowerCase()}`
 }
-
-// ---------------------------------------------------------------------------
-// Réponses API (sous-ensembles utilisés)
-// ---------------------------------------------------------------------------
 
 interface SummaryResponse {
   name: string
@@ -117,24 +108,12 @@ interface MediaResponse {
   assets?: { key: string; value: string }[]
 }
 
-// ---------------------------------------------------------------------------
-// Synchronisation
-// ---------------------------------------------------------------------------
-
 let syncing = false
 
 export function isSyncing(): boolean {
   return syncing
 }
 
-/**
- * Récupère la liste complète des personnages du compte puis, pour chacun, le
- * détail (équipement, stats, M+, raids, métiers).
- *
- * Un perso qui échoue n'interrompt pas la synchro : il est reporté dans
- * `failed` et son état précédent est conservé, ce qui évite de perdre tout un
- * roster parce qu'un seul perso a été supprimé ou renommé.
- */
 export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
   if (syncing) {
     return { ok: false, characterCount: 0, failed: [], error: t('err.syncRunning') }
@@ -172,8 +151,6 @@ export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
     const failed: SyncResult['failed'] = []
     let done = 0
 
-    // Les persos sont traités par lots : le limiteur de blizzard.ts plafonne
-    // déjà la concurrence réseau, ce lot évite juste d'ouvrir 200 promesses.
     const BATCH = 6
     for (let i = 0; i < refs.length; i += BATCH) {
       const batch = refs.slice(i, i + BATCH)
@@ -216,7 +193,6 @@ export async function syncAll(win: BrowserWindow | null): Promise<SyncResult> {
   }
 }
 
-/** Resynchronise un seul personnage déjà connu. */
 export async function syncOne(id: string): Promise<CharacterDetail | null> {
   const existing = store.getData().characters[id]
   if (!existing) throw new Error(t('err.unknownCharacter'))
@@ -250,11 +226,9 @@ async function fetchCharacter(
   const base = `/profile/wow/character/${realmSlug}/${nameSlug}`
   const warnings: string[] = []
 
-  // Le résumé est obligatoire : sans lui, le perso n'est pas exploitable.
   const summary = await apiGet<SummaryResponse>(base)
   if (!summary) throw new Error(t('err.profileUnavailable'))
 
-  // Le reste est optionnel et tolérant aux 404 (pas de M+, pas de métier...).
   const [equipment, statistics, mythic, raids, professions, media] = await Promise.all([
     safe(() => apiGet<EquipmentResponse>(`${base}/equipment`, { optional: true }), warnings, 'equipment'),
     safe(() => apiGet<StatisticsResponse>(`${base}/statistics`, { optional: true }), warnings, 'statistics'),
@@ -296,7 +270,6 @@ async function fetchCharacter(
   }
 }
 
-/** Isole les endpoints secondaires : leur échec ne doit pas perdre le perso. */
 async function safe<T>(
   fn: () => Promise<T | null>,
   warnings: string[],
@@ -319,8 +292,6 @@ function parseGear(equipment: EquipmentResponse | null): GearItem[] {
       (e) => e.enchantment_slot?.type !== 'TEMPORARY'
     )
 
-    // OFF_HAND n'est enchantable que si c'est une arme (item_class 2) : un
-    // bouclier ou un focus ne doit pas être signalé comme non enchanté.
     const enchantable =
       ENCHANTABLE_SLOTS.has(slot) && (slot !== 'OFF_HAND' || item.item_class?.id === 2)
 
@@ -342,8 +313,6 @@ function parseGear(equipment: EquipmentResponse | null): GearItem[] {
 function parseStats(stats: StatisticsResponse | null): CharacterStats | null {
   if (!stats) return null
 
-  // On memorise la cle de traduction, pas le libelle : la langue peut changer
-  // sans qu'on resynchronise le personnage.
   const candidates: { name: string; value: number }[] = [
     { name: 'strength', value: stats.strength?.effective ?? 0 },
     { name: 'agility', value: stats.agility?.effective ?? 0 },
@@ -355,8 +324,7 @@ function parseStats(stats: StatisticsResponse | null): CharacterStats | null {
     health: stats.health ?? 0,
     primary: primary.value > 0 ? primary : null,
     stamina: stats.stamina?.effective ?? 0,
-    // spell_crit pour les casters, melee_crit sinon : on prend le plus élevé,
-    // les deux sont égaux hors buffs spécifiques.
+
     crit: Math.max(stats.melee_crit?.value ?? 0, stats.spell_crit?.value ?? 0),
     haste: stats.melee_haste?.value ?? 0,
     mastery: stats.mastery?.value ?? 0,
@@ -386,7 +354,6 @@ function parseMythic(mythic: MythicResponse | null): MythicPlusInfo | null {
 function parseRaids(raids: RaidsResponse | null): RaidProgressEntry[] {
   if (!raids?.expansions?.length) return []
 
-  // Seule l'extension courante nous intéresse : le reste est du legacy.
   const latest = raids.expansions.reduce((best, exp) =>
     exp.expansion.id > best.expansion.id ? exp : best
   )
@@ -410,7 +377,6 @@ function parseRaids(raids: RaidsResponse | null): RaidProgressEntry[] {
 function parseProfessions(professions: ProfessionsResponse | null): ProfessionEntry[] {
   if (!professions?.primaries) return []
   return professions.primaries.map((primary) => {
-    // Le dernier palier est celui de l'extension courante.
     const tier = primary.tiers?.[primary.tiers.length - 1]
     return {
       name: localized(primary.profession.name),

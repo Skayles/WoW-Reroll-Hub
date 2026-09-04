@@ -3,17 +3,9 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
 
-/** Portraits de personnage servis par Blizzard, seule source d'images distante. */
 const RENDER_HOSTS =
   'https://render.worldofwarcraft.com https://render-eu.worldofwarcraft.com https://render-us.worldofwarcraft.com https://render-kr.worldofwarcraft.com https://render-tw.worldofwarcraft.com'
 
-/**
- * Injecte la CSP du renderer.
- *
- * En développement, Vite et React Refresh insèrent un script inline dans la
- * page : une politique `script-src 'self'` seule casserait le rechargement à
- * chaud. La production, elle, reste stricte.
- */
 function cspPlugin(): Plugin {
   let dev = false
   return {

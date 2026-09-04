@@ -11,7 +11,6 @@ interface Props {
   character: CharacterDetail
 }
 
-/** Rend un problème d'équipement structuré dans la langue courante. */
 function issueText(issue: GearIssue, t: Translate): string {
   const slot = issue.slot ? t(`slot.${issue.slot}`) : ''
   switch (issue.type) {
@@ -110,7 +109,7 @@ export default function CharacterView({ hub, character }: Props): JSX.Element {
         <Kpi label={t('char.kpi.level')} value={character.level} />
         <Kpi
           label={t('char.kpi.focus')}
-          value={focus.recommended ? focus.recommended.contentTag : t('common.none')}
+          value={focus.recommended ? t(focus.recommended.labelKey) : t('common.none')}
           small
         />
       </div>

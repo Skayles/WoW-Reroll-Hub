@@ -9,7 +9,6 @@ const exec = promisify(execFile)
 
 const KNOWN_FLAVORS = WOW_FLAVORS.map((f) => f.id)
 
-/** Un dossier est une racine WoW valide s'il contient au moins une saveur. */
 export function flavorsIn(root: string): string[] {
   try {
     return KNOWN_FLAVORS.filter((flavor) => fs.existsSync(path.join(root, flavor)))
@@ -22,10 +21,6 @@ export function isWowRoot(root: string): boolean {
   return flavorsIn(root).length > 0
 }
 
-/**
- * Certains utilisateurs pointent le dossier `_retail_` au lieu de la racine.
- * On remonte d'un cran dans ce cas plutôt que de refuser le chemin.
- */
 export function normalizeWowRoot(input: string): string | null {
   const candidate = path.normalize(input.trim().replace(/^"|"$/g, ''))
   if (!candidate) return null
@@ -34,14 +29,12 @@ export function normalizeWowRoot(input: string): string | null {
   const parent = path.dirname(candidate)
   if (KNOWN_FLAVORS.includes(path.basename(candidate)) && isWowRoot(parent)) return parent
 
-  // Cas du dossier .../Interface/AddOns fourni par erreur.
   const upThree = path.resolve(candidate, '..', '..', '..')
   if (isWowRoot(upThree)) return upThree
 
   return null
 }
 
-/** Interroge le registre Windows, source la plus fiable quand elle existe. */
 async function fromRegistry(): Promise<string[]> {
   const keys = [
     'HKLM\\SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\World of Warcraft',
@@ -58,13 +51,11 @@ async function fromRegistry(): Promise<string[]> {
       const match = stdout.match(/InstallPath\s+REG_SZ\s+(.+)/i)
       if (match) found.push(match[1].trim())
     } catch {
-      // Clé absente : normal si WoW n'a jamais été installé via ce canal.
     }
   }
   return found
 }
 
-/** Emplacements par défaut, testés sur chaque lettre de lecteur présente. */
 function commonPaths(): string[] {
   const suffixes = [
     'Program Files (x86)\\World of Warcraft',
@@ -83,7 +74,6 @@ function commonPaths(): string[] {
   return paths
 }
 
-/** Détecte toutes les installations WoW de la machine. */
 export async function detectInstalls(): Promise<WowInstall[]> {
   const candidates = new Set<string>()
 

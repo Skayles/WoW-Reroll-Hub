@@ -10,35 +10,33 @@ import type {
 } from './types'
 import { ENCHANTABLE_SLOTS } from './constants'
 import { slotCapacity, slotGroupRank, type SlotGroup } from './slots'
+import {
+  contentKey,
+  contentLabelKey,
+  contentRank,
+  type ContentCategory,
+  type RaidDifficulty
+} from './content'
 
-/** Amélioration enrichie du contenu d'où elle provient. */
-export type TaggedUpgrade = DroptimizerUpgrade & { contentTag: string }
+export type TaggedUpgrade = DroptimizerUpgrade & { labelKey: string }
 
-/**
- * Classe les contenus simulés d'un personnage par potentiel de gain, et calcule
- * la meilleure pièce par emplacement.
- *
- * Le classement ne se base pas uniquement sur le meilleur objet : un seul objet
- * à +8 % dans un contenu où rien d'autre ne drop est moins intéressant qu'un
- * contenu où cinq objets rapportent +4 %. D'où le tri sur la moyenne des trois
- * meilleurs gains, le pic servant seulement de départage.
- */
 export function computeFocus(
   character: CharacterDetail,
   reports: DroptimizerReport[]
 ): CharacterFocus {
   const own = reports.filter((r) => r.characterId === character.id)
 
-  const byTag = new Map<string, DroptimizerReport[]>()
+  const byContent = new Map<string, DroptimizerReport[]>()
   for (const report of own) {
-    const tag = contentTagOf(report)
-    const list = byTag.get(tag)
+    const key = contentKey(report.category, report.difficulty)
+    const list = byContent.get(key)
     if (list) list.push(report)
-    else byTag.set(tag, [report])
+    else byContent.set(key, [report])
   }
 
   const entries: FocusEntry[] = []
-  for (const [contentTag, group] of byTag) {
+  for (const group of byContent.values()) {
+    const { category, difficulty } = group[0]
     const upgrades = group
       .flatMap((r) => r.upgrades)
       .filter((u) => u.gainPct > 0)
@@ -48,14 +46,15 @@ export function computeFocus(
     const top3AvgPct = top3.length
       ? top3.reduce((sum, u) => sum + u.gainPct, 0) / top3.length
       : 0
-    // Moyenne calculée sur les mêmes objets que le pourcentage, pour que les
-    // deux chiffres racontent la même histoire.
+
     const top3AvgGain = top3.length
       ? top3.reduce((sum, u) => sum + u.gain, 0) / top3.length
       : 0
 
     entries.push({
-      contentTag,
+      category,
+      difficulty,
+      labelKey: contentLabelKey(category, difficulty),
       bestGainPct: upgrades[0]?.gainPct ?? 0,
       bestGain: upgrades[0]?.gain ?? 0,
       top3AvgPct,
@@ -66,7 +65,12 @@ export function computeFocus(
     })
   }
 
-  entries.sort((a, b) => b.top3AvgPct - a.top3AvgPct || b.bestGainPct - a.bestGainPct)
+  entries.sort(
+    (a, b) =>
+      b.top3AvgPct - a.top3AvgPct ||
+      b.bestGainPct - a.bestGainPct ||
+      contentRank(a.category, a.difficulty) - contentRank(b.category, b.difficulty)
+  )
 
   return {
     characterId: character.id,
@@ -78,32 +82,33 @@ export function computeFocus(
   }
 }
 
-function contentTagOf(report: DroptimizerReport): string {
-  return report.contentTag || report.contentLabel || 'Non classé'
+export interface ContentScope {
+  category: ContentCategory
+  difficulty: RaidDifficulty | null
 }
 
-/**
- * Meilleure amélioration par emplacement, tous rapports confondus.
- *
- * Sans ce regroupement, un droptimizer renvoie dix colliers concurrents alors
- * qu'un seul peut être porté : la question utile est « quelle pièce viser pour
- * ce slot », pas « quels sont les dix meilleurs objets ».
- *
- * Les anneaux et les bijoux gardent deux entrées, puisque deux se portent.
- */
+export function reportsFor(
+  reports: DroptimizerReport[],
+  characterId: string,
+  scope: ContentScope | null
+): DroptimizerReport[] {
+  return reports.filter((report) => {
+    if (report.characterId !== characterId) return false
+    if (!scope) return true
+    return contentKey(report.category, report.difficulty) === contentKey(scope.category, scope.difficulty)
+  })
+}
+
 export function computeBySlot(reports: DroptimizerReport[]): SlotUpgrades[] {
-  // Un même objet peut apparaître dans plusieurs rapports : on ne conserve que
-  // son meilleur gain, en mémorisant le contenu correspondant.
   const bestByItem = new Map<number, TaggedUpgrade>()
   const unidentified: TaggedUpgrade[] = []
 
   for (const report of reports) {
-    const contentTag = contentTagOf(report)
+    const labelKey = contentLabelKey(report.category, report.difficulty)
     for (const upgrade of report.upgrades) {
       if (upgrade.gainPct <= 0) continue
-      const tagged: TaggedUpgrade = { ...upgrade, contentTag }
+      const tagged: TaggedUpgrade = { ...upgrade, labelKey }
 
-      // itemId 0 = objet non résolu : il n'est pas dédoublonnable par identifiant.
       if (!upgrade.itemId) {
         unidentified.push(tagged)
         continue
@@ -132,19 +137,10 @@ export function computeBySlot(reports: DroptimizerReport[]): SlotUpgrades[] {
     })
   }
 
-  // Ordre du panneau d'équipement plutôt que par gain : on cherche un slot
-  // précis dans cette liste, elle doit rester à la même place d'un perso à l'autre.
   slots.sort((a, b) => slotGroupRank(a.slotGroup) - slotGroupRank(b.slotGroup))
   return slots
 }
 
-/**
- * Problèmes détectables sans simulation : enchantements manquants et châsses
- * vides. Ce sont des gains gratuits, à traiter avant tout farm.
- *
- * Renvoyés sous forme structurée : l'application et l'addon les rendent chacun
- * dans leur propre langue.
- */
 export function findGearIssues(character: CharacterDetail): GearIssue[] {
   const issues: GearIssue[] = []
   for (const item of character.gear) {
@@ -159,7 +155,6 @@ export function findGearIssues(character: CharacterDetail): GearIssue[] {
   return issues
 }
 
-/** Écart entre le pire slot équipé et l'ilvl moyen : repère les slots à retard. */
 export function findWeakSlots(character: CharacterDetail, threshold = 6): WeakSlot[] {
   if (!character.gear.length) return []
   const relevant = character.gear.filter(
@@ -174,5 +169,4 @@ export function findWeakSlots(character: CharacterDetail, threshold = 6): WeakSl
     .map((g) => ({ slot: g.slot, itemLevel: g.itemLevel }))
 }
 
-/** Utilisé par ENCHANTABLE_SLOTS côté synchro ; réexporté pour commodité. */
 export { ENCHANTABLE_SLOTS }

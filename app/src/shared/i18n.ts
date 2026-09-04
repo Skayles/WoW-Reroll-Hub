@@ -1,14 +1,3 @@
-/**
- * Traduction de l'application (français / anglais).
- *
- * Le français reste la langue de référence : une clé absente de l'anglais y
- * retombe plutôt que d'afficher la clé brute. Les paramètres sont interpolés
- * avec la syntaxe {nom}.
- *
- * Les messages d'erreur du process main passent aussi par ici, puisqu'ils
- * remontent tels quels dans l'interface.
- */
-
 export type Lang = 'fr' | 'en'
 
 export const LANGS: { id: Lang; label: string }[] = [
@@ -19,7 +8,6 @@ export const LANGS: { id: Lang; label: string }[] = [
 export type Dict = Record<string, string>
 
 const fr: Dict = {
-  // -- général
   'app.name': 'WoW Reroll Hub',
   'common.loading': 'Chargement…',
   'common.cancel': 'Annulé.',
@@ -29,12 +17,10 @@ const fr: Dict = {
   'common.close': 'Fermer',
   'common.characters': '{count} personnages',
 
-  // -- onglets
   'tab.character': 'Personnage',
   'tab.export': 'Export addon',
   'tab.settings': 'Réglages',
 
-  // -- roster
   'roster.search': 'Rechercher un perso, un royaume…',
   'roster.sort.ilvl': 'Trier par ilvl',
   'roster.sort.mplus': 'Trier par score M+',
@@ -51,7 +37,6 @@ const fr: Dict = {
   'roster.lastSync': 'Dernière synchro : {date}',
   'roster.count': '{count} perso{s}',
 
-  // -- fiche personnage
   'char.empty.title': 'Aucun personnage',
   'char.empty.body':
     'Connecte-toi à Battle.net dans Réglages, puis lance une synchronisation : tous les persos du compte apparaîtront ici sans avoir à te connecter en jeu sur chacun.',
@@ -89,7 +74,6 @@ const fr: Dict = {
   'char.note.placeholder': 'Ex : reroll main si tier 4p, sinon rester alt M+',
   'char.partialSync': 'Synchro partielle — {details}',
 
-  // -- statistiques
   'stat.stamina': 'Endurance',
   'stat.health': 'Points de vie',
   'stat.crit': 'Critique',
@@ -104,7 +88,6 @@ const fr: Dict = {
   'stat.agility': 'Agilité',
   'stat.intellect': 'Intelligence',
 
-  // -- rôles et factions
   'role.TANK': 'Tank',
   'role.HEALER': 'Soigneur',
   'role.DAMAGE': 'DPS',
@@ -112,7 +95,6 @@ const fr: Dict = {
   'faction.HORDE': 'Horde',
   'faction.NEUTRAL': 'Neutre',
 
-  // -- slots d'équipement (personnage)
   'slot.HEAD': 'Tête',
   'slot.NECK': 'Cou',
   'slot.SHOULDER': 'Épaules',
@@ -132,7 +114,6 @@ const fr: Dict = {
   'slot.MAIN_HAND': 'Main droite',
   'slot.OFF_HAND': 'Main gauche',
 
-  // -- groupes de slots (objets simulés)
   'slotGroup.HEAD': 'Tête',
   'slotGroup.NECK': 'Cou',
   'slotGroup.SHOULDER': 'Épaules',
@@ -151,7 +132,6 @@ const fr: Dict = {
   'slotGroup.TABARD': 'Tabard',
   'slotGroup.OTHER': 'Autre',
 
-  // -- droptimizer
   'dropt.title': 'Droptimizer',
   'dropt.hint': 'quel contenu farmer en priorité sur {name}',
   'dropt.placeholder.url': 'https://www.raidbots.com/simbot/report/…',
@@ -173,6 +153,23 @@ const fr: Dict = {
   'dropt.focus.top3': 'moy. top 3',
   'dropt.focus.peak': 'pic +{value}%',
   'dropt.gainDps': '+{value} dps',
+  'content.RAID': 'Raid',
+  'content.RAID.NORMAL': 'Raid normal',
+  'content.RAID.HEROIC': 'Raid héroïque',
+  'content.RAID.MYTHIC': 'Raid mythique',
+  'content.MYTHIC_PLUS': 'Mythique+',
+  'content.BONUS_ROLL': 'Bonus rolls',
+  'content.OTHER': 'Autre',
+  'difficulty.NORMAL': 'Normal',
+  'difficulty.HEROIC': 'Héroïque',
+  'difficulty.MYTHIC': 'Mythique',
+  'tabs.total': 'Total',
+  'tabs.empty': 'Aucun droptimizer importé pour {content}. Colle le lien du rapport ci-dessus : il sera classé dans cet onglet.',
+  'dropt.importInto': 'Sera classé dans : {content}. Remplace le rapport existant de ce contenu.',
+  'dropt.importAuto':
+    "La catégorie sera déduite du titre du rapport. Choisis un onglet pour l'imposer.",
+  'dropt.replaced': 'Droptimizer importé, il remplace le précédent de ce contenu.',
+  'dropt.category': 'Contenu',
   'dropt.view.bySlot': 'Meilleur par slot',
   'dropt.view.all': 'Tous les objets',
   'dropt.bySlot.title': 'Meilleure pièce par slot',
@@ -189,7 +186,6 @@ const fr: Dict = {
   'dropt.report.expand': 'Voir les {count} objets',
   'dropt.report.collapse': 'Réduire',
 
-  // -- export
   'export.title': "Export vers l'addon",
   'export.hint': '{count} personnages seront écrits',
   'export.step1':
@@ -227,7 +223,6 @@ const fr: Dict = {
   'export.contents.note': 'Ta note libre écrite dans la fiche du personnage.',
   'export.previewTitle': 'Aperçu',
 
-  // -- réglages
   'settings.auth': 'Connexion Battle.net',
   'settings.auth.hint': 'une seule fois, puis tous les persos remontent seuls',
   'settings.auth.step1':
@@ -276,6 +271,10 @@ const fr: Dict = {
   'settings.wow.flavor': 'Version du jeu',
   'settings.autoExport': 'Export automatique',
   'settings.autoExport.desc': 'Réécrit les données de l\'addon après chaque synchronisation.',
+  'settings.about': 'À propos',
+  'settings.disclaimer':
+    "WoW Reroll Hub et l'addon Reroll Helper ont été réalisés avec l'aide d'une IA (Claude), sous direction et relecture humaines. L'addon se contente d'afficher le fichier écrit par cette application : il ne collecte rien dans le jeu et n'envoie rien sur le réseau.",
+  'settings.repo': 'Code source et suivi des problèmes',
   'settings.journal': 'Index du butin',
   'settings.journal.desc':
     'Associe chaque objet simulé au donjon ou au boss qui le fait tomber, à partir du journal des aventures de Blizzard. Construit automatiquement au premier import de droptimizer.',
@@ -285,13 +284,11 @@ const fr: Dict = {
   'settings.journal.empty': 'Index non construit.',
   'settings.journal.done': 'Index du butin reconstruit : {count} objets.',
 
-  // -- synchronisation
   'sync.account': 'Lecture du compte Battle.net…',
   'sync.done': '{count} personnages synchronisés.',
   'sync.failedSome': ' {count} en échec : {names}',
   'sync.failed': 'Synchronisation échouée.',
 
-  // -- erreurs du process main
   'err.credentialsMissing':
     'Client ID et Client Secret Battle.net requis. Renseigne-les dans Réglages (créés sur https://develop.battle.net/access/clients).',
   'err.portInUse':
@@ -338,13 +335,11 @@ const fr: Dict = {
   'err.urlRefused': 'URL refusée.',
   'err.unknown': 'Erreur inconnue.',
 
-  // -- notes du parseur
   'note.unresolvedItems':
     '{count} objet(s) sans identifiant reconnu, affichés avec leur nom brut.',
   'note.unknownSources':
     "{count} objet(s) sans source connue : reconstruis l'index du butin dans Réglages si le contenu est récent.",
 
-  // -- problèmes d'équipement
   'issue.enchant': "{slot} : pas d'enchantement",
   'issue.socket': '{slot} : {count} châsse vide',
   'issue.sockets': '{slot} : {count} châsses vides',
@@ -497,6 +492,22 @@ const en: Dict = {
   'dropt.focus.top3': 'top 3 avg.',
   'dropt.focus.peak': 'peak +{value}%',
   'dropt.gainDps': '+{value} dps',
+  'content.RAID': 'Raid',
+  'content.RAID.NORMAL': 'Normal raid',
+  'content.RAID.HEROIC': 'Heroic raid',
+  'content.RAID.MYTHIC': 'Mythic raid',
+  'content.MYTHIC_PLUS': 'Mythic+',
+  'content.BONUS_ROLL': 'Bonus rolls',
+  'content.OTHER': 'Other',
+  'difficulty.NORMAL': 'Normal',
+  'difficulty.HEROIC': 'Heroic',
+  'difficulty.MYTHIC': 'Mythic',
+  'tabs.total': 'Total',
+  'tabs.empty': 'No droptimizer imported for {content}. Paste the report link above: it will be filed under this tab.',
+  'dropt.importInto': 'Will be filed under: {content}. Replaces the existing report for that content.',
+  'dropt.importAuto': 'The category will be guessed from the report title. Pick a tab to force it.',
+  'dropt.replaced': 'Droptimizer imported, replacing the previous one for this content.',
+  'dropt.category': 'Content',
   'dropt.view.bySlot': 'Best per slot',
   'dropt.view.all': 'All items',
   'dropt.bySlot.title': 'Best piece per slot',
@@ -599,6 +610,10 @@ const en: Dict = {
   'settings.wow.flavor': 'Game version',
   'settings.autoExport': 'Automatic export',
   'settings.autoExport.desc': 'Rewrites the addon data after every sync.',
+  'settings.about': 'About',
+  'settings.disclaimer':
+    'WoW Reroll Hub and the Reroll Helper addon were built with help from an AI assistant (Claude), under human direction and review. The addon only displays the file written by this application: it collects nothing in game and sends nothing over the network.',
+  'settings.repo': 'Source code and issue tracker',
   'settings.journal': 'Loot index',
   'settings.journal.desc':
     "Maps each simulated item to the dungeon or boss that drops it, using Blizzard's adventure journal. Built automatically on the first droptimizer import.",
@@ -682,24 +697,17 @@ export function translator(lang: Lang): Translate {
         text = text.split(`{${name}}`).join(String(value))
       }
     }
-    // {s} marque un pluriel simple : présent seulement si un paramètre "count"
-    // supérieur à 1 accompagne la clé.
+
     const count = Number(params?.count)
     text = text.split('{s}').join(count > 1 ? 's' : '')
     return text
   }
 }
 
-/**
- * Locale de formatage des nombres, alignée sur la langue de l'interface :
- * un séparateur de milliers français au milieu d'une interface anglaise
- * jurerait.
- */
 export function numberLocale(lang: Lang): string {
   return lang === 'en' ? 'en-GB' : 'fr-FR'
 }
 
-/** Langue par défaut déduite de la locale système, français sinon. */
 export function defaultLang(systemLocale: string): Lang {
   return systemLocale.toLowerCase().startsWith('fr') ? 'fr' : 'en'
 }

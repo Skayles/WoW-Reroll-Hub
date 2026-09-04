@@ -3,26 +3,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { DroptimizerReport, DroptimizerUpgrade } from '@shared/types'
 import { groupForInventoryType, type SlotGroup } from '@shared/slots'
+import { detectContent, type ContentCategory, type RaidDifficulty } from '@shared/content'
 import { apiGet, localized } from './blizzard'
 import { ensureIndex, lookup } from './journal'
 import { store as settingsStore } from './store'
 import { t } from './i18n'
 
-/**
- * Import d'un rapport Droptimizer Raidbots.
- *
- * Raidbots ne documente pas publiquement le format de data.json et le nom des
- * profilesets a déjà changé plusieurs fois. Le parseur est donc volontairement
- * tolérant : il extrait les identifiants d'objet par heuristique, puis les
- * résout via l'API Blizzard (qui, elle, est stable) pour obtenir le nom, le
- * type d'inventaire et — via le journal des aventures — le boss qui les fait
- * tomber. Un identifiant non résolu conserve son nom brut plutôt que d'être
- * jeté.
- */
-
 const REPORT_ID_RE = /^[A-Za-z0-9_-]{4,40}$/
 
-/** Accepte une URL de rapport complète ou un identifiant nu. */
 export function extractReportId(input: string): string | null {
   const trimmed = input.trim()
   if (!trimmed) return null
@@ -31,7 +19,7 @@ export function extractReportId(input: string): string | null {
   try {
     const url = new URL(trimmed)
     if (!/raidbots\.com$/i.test(url.hostname.replace(/^www\./, ''))) return null
-    // .../simbot/report/<id>, .../reports/<id>/data.json
+
     const segments = url.pathname.split('/').filter(Boolean)
     const marker = segments.findIndex((s) => s === 'report' || s === 'reports')
     const candidate = marker >= 0 ? segments[marker + 1] : segments[segments.length - 1]
@@ -78,11 +66,12 @@ export function parseRawJson(text: string): RawSim {
   return sim
 }
 
-/** Convertit un rapport brut en modèle applicatif. */
 export async function buildReport(
   raw: RawSim,
   reportId: string,
-  characterId: string
+  characterId: string,
+
+  forced?: { category: ContentCategory; difficulty: RaidDifficulty | null }
 ): Promise<DroptimizerReport> {
   const notes: string[] = []
 
@@ -95,8 +84,6 @@ export async function buildReport(
   const results = raw.sim?.profilesets?.results ?? []
   if (!results.length) throw new Error(t('err.notDroptimizer'))
 
-  // Un même objet apparaît à plusieurs ilvl/difficultés : on ne garde que sa
-  // meilleure occurrence, c'est elle qui décide s'il vaut le coup de farm.
   const best = new Map<string, { itemId: number | null; rawName: string; dps: number }>()
   for (const result of results) {
     const rawName = result.name ?? ''
@@ -111,12 +98,9 @@ export async function buildReport(
   const unresolved = [...best.values()].filter((e) => e.itemId === null).length
   if (unresolved) notes.push(t('note.unresolvedItems', { count: unresolved }))
 
-  // L'index du butin est construit ici plutôt qu'au démarrage : il ne sert
-  // qu'aux droptimizers, et sa construction coûte une centaine de requêtes.
   try {
     await ensureIndex()
   } catch {
-    // Sans index, les objets restent affichés, simplement sans leur source.
   }
 
   const upgrades: DroptimizerUpgrade[] = []
@@ -148,12 +132,14 @@ export async function buildReport(
   upgrades.sort((a, b) => b.gainPct - a.gainPct)
 
   const contentLabel = raw.simbot?.title?.trim() || `Droptimizer ${reportId}`
+  const detected = forced ?? detectContent(contentLabel)
 
   return {
     reportId,
     characterId,
     contentLabel,
-    contentTag: contentLabel,
+    category: detected.category,
+    difficulty: detected.difficulty,
     simType: raw.simbot?.type ?? 'droptimizer',
     baselineDps: Math.round(baselineDps),
     fightStyle: raw.sim?.options?.fight_style ?? null,
@@ -166,19 +152,10 @@ export async function buildReport(
   }
 }
 
-/**
- * Re-résout noms d'objets, emplacements et sources d'un rapport déjà importé.
- *
- * Les libellés sont figés dans le rapport au moment de l'import : sans ça, un
- * changement de langue laisserait des noms français dans une interface
- * anglaise. Les gains, eux, ne sont pas recalculés — ils ne dépendent pas de
- * la langue.
- */
 export async function refreshReport(report: DroptimizerReport): Promise<DroptimizerReport> {
   try {
     await ensureIndex()
   } catch {
-    // Sans index, on met quand même les noms à jour.
   }
 
   const upgrades: DroptimizerUpgrade[] = []
@@ -201,16 +178,6 @@ export async function refreshReport(report: DroptimizerReport): Promise<Droptimi
   return { ...report, upgrades }
 }
 
-// ---------------------------------------------------------------------------
-// Heuristiques sur le nom de profileset
-// ---------------------------------------------------------------------------
-
-/**
- * Les identifiants d'objet WoW actuels tiennent sur 5 à 7 chiffres. Les autres
- * segments numériques d'un nom de profileset (ilvl ~600-750, bonus IDs à 3-4
- * chiffres, index d'encounter) tombent en dehors, sauf collision rare : on
- * privilégie donc le segment le plus grand, qui est presque toujours l'item ID.
- */
 function guessItemId(rawName: string): number | null {
   const segments = rawName.split(/[/|:,\s]+/)
   const candidates = segments
@@ -225,10 +192,6 @@ function prettifyRawName(rawName: string): string {
   return words.join(' ') || rawName
 }
 
-// ---------------------------------------------------------------------------
-// Résolution des objets via l'API Blizzard (avec cache disque)
-// ---------------------------------------------------------------------------
-
 interface ItemMeta {
   name: string
   slotGroup: SlotGroup
@@ -240,13 +203,11 @@ let cacheDirty = false
 
 function loadCache(): Record<string, ItemMeta | null> {
   if (cache) return cache
-  // Suffixe de version : le cache v1 stockait un libellé de slot figé, devenu
-  // incompatible avec les groupes normalisés. Le renommer l'invalide proprement.
+
   cachePath = path.join(app.getPath('userData'), 'item-cache-v2.json')
   try {
     const raw = JSON.parse(fs.readFileSync(cachePath, 'utf8')) as Record<string, ItemMeta | null>
-    // Les entrées de l'ancien format n'ont pas de préfixe de locale : elles ne
-    // seront jamais relues, autant ne pas les traîner indéfiniment.
+
     cache = Object.fromEntries(Object.entries(raw).filter(([key]) => key.includes(':')))
     if (Object.keys(cache).length !== Object.keys(raw).length) cacheDirty = true
   } catch {
@@ -261,7 +222,6 @@ export function flushItemCache(): void {
     fs.writeFileSync(cachePath, JSON.stringify(cache), 'utf8')
     cacheDirty = false
   } catch {
-    /* le cache est un confort, pas une donnée critique */
   }
 }
 
@@ -270,12 +230,6 @@ interface ItemResponse {
   inventory_type?: { type: string; name?: unknown }
 }
 
-/**
- * Les noms d'objets sont localisés : la clé de cache doit inclure la locale,
- * sinon un nom mis en cache en français ressort en français même après un
- * passage en anglais. Garder les deux permet aussi de basculer d'une langue à
- * l'autre sans redemander les objets déjà connus.
- */
 function cacheKey(itemId: number): string {
   return `${settingsStore.getSettings().locale}:${itemId}`
 }
@@ -300,8 +254,6 @@ async function resolveItem(itemId: number): Promise<ItemMeta | null> {
     cacheDirty = true
     return meta
   } catch {
-    // Un échec de résolution ne doit pas être mis en cache : l'objet pourra
-    // être retrouvé au prochain import.
     return null
   }
 }

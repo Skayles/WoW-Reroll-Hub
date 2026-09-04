@@ -10,16 +10,11 @@ import { store } from './store'
 import { t } from './i18n'
 import { addonsDir, isWowRoot } from './wowPath'
 
-/** Dossier source de l'addon, différent selon dev / application packagée. */
 function addonSourceDir(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'addon', ADDON_NAME)
     : path.resolve(app.getAppPath(), '..', 'addon', ADDON_NAME)
 }
-
-// ---------------------------------------------------------------------------
-// Construction du payload
-// ---------------------------------------------------------------------------
 
 function buildPayload(): { lua: string; count: number } {
   const data = store.getData()
@@ -37,8 +32,7 @@ function buildPayload(): { lua: string; count: number } {
     generatedAt: Math.floor(Date.now() / 1000),
     generatedAtText: new Date().toLocaleString(settings.language === 'en' ? 'en-GB' : 'fr-FR'),
     region: settings.region,
-    // L'addon suit la langue choisie dans l'application plutôt que celle du
-    // client WoW : c'est ce que l'utilisateur a explicitement demandé ici.
+
     lang: settings.language,
     characters
   }
@@ -82,7 +76,8 @@ function serializeCharacter(
     note: note ?? '',
     focus: focus.recommended
       ? {
-          content: focus.recommended.contentTag,
+          category: focus.recommended.category,
+          difficulty: focus.recommended.difficulty ?? '',
           bestGainPct: round2(focus.recommended.bestGainPct),
           bestGain: Math.round(focus.recommended.bestGain),
           top3AvgPct: round2(focus.recommended.top3AvgPct),
@@ -91,15 +86,15 @@ function serializeCharacter(
         }
       : null,
     contents: focus.entries.map((entry) => ({
-      tag: entry.contentTag,
+      category: entry.category,
+      difficulty: entry.difficulty ?? '',
       bestGainPct: round2(entry.bestGainPct),
       bestGain: Math.round(entry.bestGain),
       top3AvgPct: round2(entry.top3AvgPct),
       top3AvgGain: Math.round(entry.top3AvgGain),
       upgradeCount: entry.upgradeCount
     })),
-    // Meilleure pièce par emplacement, avec le boss qui la fait tomber : c'est
-    // la vue la plus actionnable en jeu, on l'envoie telle quelle.
+
     bySlot: focus.bySlot
       .filter((slot) => slot.upgrades.length > 0)
       .map((slot) => ({
@@ -110,12 +105,15 @@ function serializeCharacter(
           name: upgrade.itemName,
           gainPct: round2(upgrade.gainPct),
           gain: Math.round(upgrade.gain),
-          content: upgrade.contentTag,
+          category: upgrade.labelKey.startsWith('content.RAID.') ? 'RAID' : upgrade.labelKey.replace('content.', ''),
+          difficulty: upgrade.labelKey.startsWith('content.RAID.')
+            ? upgrade.labelKey.replace('content.RAID.', '')
+            : '',
           instance: upgrade.instance ?? '',
           boss: upgrade.boss ?? ''
         }))
       })),
-    // Problèmes décrits de façon structurée : l'addon les rend dans sa langue.
+
     issues: focus.gearIssues.map((issue) => ({
       type: issue.type,
       slot: issue.slot ?? '',
@@ -138,18 +136,12 @@ function round2(value: number): number {
   return Number(value.toFixed(2))
 }
 
-// ---------------------------------------------------------------------------
-// Écriture sur disque
-// ---------------------------------------------------------------------------
-
-/** Copie les fichiers de l'addon vers le dossier AddOns (hors données). */
 function installAddonFiles(target: string): boolean {
   const source = addonSourceDir()
   if (!fs.existsSync(source)) return false
 
   fs.mkdirSync(path.join(target, 'Data'), { recursive: true })
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
-    // Le dossier Data est généré, jamais copié depuis les sources.
     if (entry.isDirectory()) continue
     fs.copyFileSync(path.join(source, entry.name), path.join(target, entry.name))
   }
@@ -183,7 +175,7 @@ export function exportToAddon(): ExportResult {
 
     const filePath = path.join(target, 'Data', 'Export.lua')
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
-    // Écriture atomique : WoW peut lire le dossier pendant qu'on écrit.
+
     const tmp = `${filePath}.tmp`
     fs.writeFileSync(tmp, lua, 'utf8')
     fs.renameSync(tmp, filePath)
@@ -197,7 +189,6 @@ export function exportToAddon(): ExportResult {
   }
 }
 
-/** Écrit le même fichier ailleurs (dépannage, machine distante). */
 export function exportToFile(filePath: string): ExportResult {
   try {
     const { lua, count } = buildPayload()
@@ -209,7 +200,6 @@ export function exportToFile(filePath: string): ExportResult {
   }
 }
 
-/** Aperçu du fichier généré, affiché dans l'interface avant export. */
 export function previewExport(): string {
   return buildPayload().lua
 }

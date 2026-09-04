@@ -18,7 +18,7 @@ function createWindow(): void {
     title: 'WoW Reroll Hub',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
-      // Le renderer n'a aucun accès direct à Node : tout passe par le preload.
+
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -30,8 +30,6 @@ function createWindow(): void {
     mainWindow = null
   })
 
-  // Les liens externes (Wowhead, Raidbots, Battle.net) partent dans le
-  // navigateur système : jamais dans une fenêtre Electron sans garde-fous.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
@@ -52,7 +50,6 @@ function createWindow(): void {
   }
 }
 
-// Une seule instance : deux fenêtres écriraient en concurrence dans data.json.
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {

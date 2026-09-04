@@ -12,8 +12,6 @@ export default function App(): JSX.Element {
   const [tab, setTab] = useState<Tab>('character')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  // Sélection par défaut : le premier perso de la liste dès qu'elle existe, et
-  // bascule automatique vers les réglages tant que rien n'est configuré.
   useEffect(() => {
     if (hub.loading) return
     if (!selectedId && hub.characters.length) {

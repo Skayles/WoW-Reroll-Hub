@@ -12,11 +12,8 @@ import type {
   SyncResult,
   WowInstall
 } from '@shared/types'
+import type { ContentCategory, RaidDifficulty } from '@shared/content'
 
-/**
- * Déballe la réponse IPC : le renderer manipule des valeurs, pas des
- * enveloppes, et une erreur du main devient une exception normale côté React.
- */
 async function call<T>(channel: string, ...args: unknown[]): Promise<T> {
   const response = (await ipcRenderer.invoke(channel, ...args)) as IpcResponse<T>
   if (!response?.ok) throw new Error(response?.error ?? 'Erreur inconnue.')
@@ -53,12 +50,22 @@ const api = {
     remove: (id: string) => call<AppData>('char:remove', id)
   },
   reports: {
-    importUrl: (input: string, characterId: string) =>
-      call<DroptimizerReport>('report:importUrl', input, characterId),
-    importJson: (text: string, characterId: string) =>
-      call<DroptimizerReport>('report:importJson', text, characterId),
+    importUrl: (
+      input: string,
+      characterId: string,
+      forced?: { category: ContentCategory; difficulty: RaidDifficulty | null }
+    ) => call<DroptimizerReport>('report:importUrl', input, characterId, forced),
+    importJson: (
+      text: string,
+      characterId: string,
+      forced?: { category: ContentCategory; difficulty: RaidDifficulty | null }
+    ) => call<DroptimizerReport>('report:importJson', text, characterId, forced),
     remove: (reportId: string) => call<AppData>('report:remove', reportId),
-    retag: (reportId: string, tag: string) => call<AppData>('report:retag', reportId, tag),
+    recategorize: (
+      reportId: string,
+      category: ContentCategory,
+      difficulty: RaidDifficulty | null
+    ) => call<AppData>('report:recategorize', reportId, category, difficulty),
     refreshAll: () => call<number>('report:refreshAll'),
     onRefreshed: (handler: (count: number) => void) => {
       const listener = (_e: unknown, count: number): void => handler(count)

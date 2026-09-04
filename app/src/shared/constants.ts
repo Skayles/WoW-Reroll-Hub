@@ -1,18 +1,17 @@
-/** Couleurs de classe officielles, indexées par classId Blizzard. */
 export const CLASS_COLORS: Record<number, string> = {
-  1: '#C79C6E', // Guerrier
-  2: '#F58CBA', // Paladin
-  3: '#ABD473', // Chasseur
-  4: '#FFF569', // Voleur
-  5: '#FFFFFF', // Prêtre
-  6: '#C41F3B', // Chevalier de la mort
-  7: '#0070DE', // Chaman
-  8: '#69CCF0', // Mage
-  9: '#9482C9', // Démoniste
-  10: '#00FF96', // Moine
-  11: '#FF7D0A', // Druide
-  12: '#A330C9', // Chasseur de démons
-  13: '#33937F' // Évocateur
+  1: '#C79C6E',
+  2: '#F58CBA',
+  3: '#ABD473',
+  4: '#FFF569',
+  5: '#FFFFFF',
+  6: '#C41F3B',
+  7: '#0070DE',
+  8: '#69CCF0',
+  9: '#9482C9',
+  10: '#00FF96',
+  11: '#FF7D0A',
+  12: '#A330C9',
+  13: '#33937F'
 }
 
 export const DEFAULT_CLASS_COLOR = '#9aa4b2'
@@ -21,7 +20,6 @@ export function classColor(classId: number): string {
   return CLASS_COLORS[classId] ?? DEFAULT_CLASS_COLOR
 }
 
-/** Ordre d'affichage des slots, aligné sur le panneau d'équipement en jeu. */
 export const SLOT_ORDER = [
   'HEAD',
   'NECK',
@@ -43,10 +41,6 @@ export const SLOT_ORDER = [
   'TABARD'
 ]
 
-/**
- * Slots enchantables sur la version actuelle du jeu. Sert à signaler les
- * enchantements manquants sans faux positif sur les slots qui n'en prennent pas.
- */
 export const ENCHANTABLE_SLOTS = new Set([
   'BACK',
   'CHEST',
@@ -74,7 +68,6 @@ export function qualityColor(quality: string): string {
   return QUALITY_COLORS[quality] ?? '#ffffff'
 }
 
-/** Saveurs WoW connues, associées au nom de dossier sur disque. */
 export const WOW_FLAVORS: { id: string; label: string }[] = [
   { id: '_retail_', label: 'Retail' },
   { id: '_ptr_', label: 'PTR' },

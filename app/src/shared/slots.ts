@@ -1,17 +1,3 @@
-/**
- * Normalisation des slots d'objet.
- *
- * Attention : Blizzard utilise deux vocabulaires distincts.
- *  - Les slots d'un personnage équipé (`equipped_items[].slot.type`) valent
- *    HEAD, FINGER_1, TRINKET_2, HANDS, BACK, MAIN_HAND…
- *  - Le type d'inventaire d'un objet (`inventory_type.type`) vaut FINGER,
- *    TRINKET, HAND, CLOAK, ROBE, WEAPONMAINHAND…
- *
- * Confondre les deux fait échouer toute tentative de regrouper les
- * améliorations d'un droptimizer par emplacement. On ramène donc les types
- * d'inventaire à des groupes stables, indépendants de la langue.
- */
-
 export type SlotGroup =
   | 'HEAD'
   | 'NECK'
@@ -47,8 +33,7 @@ const INVENTORY_TYPE_TO_GROUP: Record<string, SlotGroup> = {
   FEET: 'FEET',
   FINGER: 'FINGER',
   TRINKET: 'TRINKET',
-  // Toutes les armes tombent dans le même groupe : un droptimizer compare des
-  // armes entre elles sans distinguer la main qui les porte.
+
   WEAPON: 'WEAPON',
   WEAPONMAINHAND: 'WEAPON',
   WEAPONOFFHAND: 'WEAPON',
@@ -63,7 +48,6 @@ const INVENTORY_TYPE_TO_GROUP: Record<string, SlotGroup> = {
   TABARD: 'TABARD'
 }
 
-/** Slots d'un personnage équipé, vers le même vocabulaire de groupes. */
 const EQUIPPED_SLOT_TO_GROUP: Record<string, SlotGroup> = {
   HEAD: 'HEAD',
   NECK: 'NECK',
@@ -95,16 +79,10 @@ export function groupForEquippedSlot(slot: string | undefined | null): SlotGroup
   return EQUIPPED_SLOT_TO_GROUP[slot.toUpperCase()] ?? 'OTHER'
 }
 
-/**
- * Nombre de pièces réellement portables sur un groupe. Deux pour les anneaux et
- * les bijoux : n'afficher qu'une seule amélioration y masquerait la moitié des
- * objets à farmer.
- */
 export function slotCapacity(group: SlotGroup): number {
   return group === 'FINGER' || group === 'TRINKET' ? 2 : 1
 }
 
-/** Ordre d'affichage, calqué sur le panneau d'équipement en jeu. */
 export const SLOT_GROUP_ORDER: SlotGroup[] = [
   'HEAD',
   'NECK',

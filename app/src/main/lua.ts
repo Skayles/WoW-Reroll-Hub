@@ -1,21 +1,10 @@
-/**
- * Sérialisation d'une valeur JavaScript en littéral de table Lua.
- *
- * Module volontairement pur (aucun import Electron) : c'est la seule partie de
- * l'export dont une erreur casserait le chargement de l'addon en jeu, elle doit
- * donc rester testable isolément.
- */
-
 export function luaString(value: string): string {
-  // Les retours chariot et guillemets doivent être échappés : un nom de guilde
-  // ou une note utilisateur exotique ne doit pas pouvoir casser le fichier.
   const escaped = value
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r')
-    // Lua 5.1 (celui de WoW) ne lit pas les échappements \u : on retire les
-    // caractères de contrôle restants plutôt que de les émettre bruts.
+
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
   return `"${escaped}"`
 }
@@ -31,7 +20,6 @@ export function toLua(value: unknown, indent = 1): string {
   if (value === null || value === undefined) return 'nil'
   if (typeof value === 'boolean') return value ? 'true' : 'false'
   if (typeof value === 'number') {
-    // NaN et Infinity ne sont pas des littéraux Lua valides.
     return Number.isFinite(value) ? String(Math.round(value * 100) / 100) : '0'
   }
   if (typeof value === 'string') return luaString(value)

@@ -19,7 +19,6 @@ const EMPTY_DATA: AppData = {
 }
 
 export interface Hub {
-  /** Traducteur figé sur la langue courante des réglages. */
   t: Translate
   data: AppData
   settings: AppSettings | null
@@ -34,7 +33,7 @@ export interface Hub {
   logout: () => Promise<void>
   syncAll: () => Promise<void>
   setBanner: (banner: { kind: 'ok' | 'error'; text: string } | null) => void
-  /** Exécute une action IPC en affichant automatiquement l'erreur éventuelle. */
+
   run: <T>(action: () => Promise<T>, successMessage?: string) => Promise<T | null>
 }
 
@@ -50,12 +49,8 @@ export function useHub(): Hub {
   const [banner, setBanner] = useState<Hub['banner']>(null)
   const [loading, setLoading] = useState(true)
 
-  // Le traducteur est mémoïsé sur la langue : changer de langue re-rend toute
-  // l'interface sans qu'aucun composant n'ait à s'abonner à autre chose.
   const t = useMemo(() => translator(settings?.language ?? 'fr'), [settings?.language])
 
-  // Les écouteurs IPC sont posés une seule fois : ils lisent la langue via
-  // cette référence plutôt que de se réabonner à chaque changement de réglage.
   const settingsRef = useRef<AppSettings | null>(null)
   settingsRef.current = settings
 

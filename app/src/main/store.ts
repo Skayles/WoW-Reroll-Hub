@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { AppData, AppSettings } from '@shared/types'
 import { defaultLang } from '@shared/i18n'
+import { detectContent } from '@shared/content'
 
 const DEFAULT_SETTINGS: AppSettings = {
   clientId: '',
@@ -26,14 +27,6 @@ const DEFAULT_DATA: AppData = {
   lastSyncAt: null
 }
 
-/**
- * Persistance sur disque dans le userData d'Electron.
- *
- * Le client secret Battle.net et le jeton d'accès ne sont jamais écrits en
- * clair : ils passent par safeStorage (DPAPI sur Windows). Si le chiffrement
- * n'est pas disponible sur la machine, on refuse de les persister plutôt que de
- * les stocker en clair — l'utilisateur devra les ressaisir à chaque lancement.
- */
 class Store {
   private settingsPath = ''
   private dataPath = ''
@@ -50,16 +43,12 @@ class Store {
     this.settings = this.readSettings()
     this.data = this.readData()
 
-    // Premier lancement : on suit la langue du système plutôt que d'imposer
-    // le français à un utilisateur anglophone.
     if (!fs.existsSync(this.settingsPath)) {
       this.settings.language = defaultLang(app.getLocale())
       if (this.settings.language === 'en') this.settings.locale = 'en_GB'
       this.saveSettings({})
     }
   }
-
-  // -- secrets -------------------------------------------------------------
 
   private encryptionAvailable(): boolean {
     try {
@@ -85,8 +74,6 @@ class Store {
     }
   }
 
-  // -- settings ------------------------------------------------------------
-
   private readSettings(): AppSettings {
     try {
       const raw = JSON.parse(fs.readFileSync(this.settingsPath, 'utf8'))
@@ -104,13 +91,11 @@ class Store {
     return { ...this.settings }
   }
 
-  /** Vue sans secret, sûre à envoyer au renderer. */
   getPublicSettings(): AppSettings {
     return { ...this.settings, clientSecret: this.settings.clientSecret ? '********' : '' }
   }
 
   saveSettings(patch: Partial<AppSettings>): AppSettings {
-    // Le renderer renvoie le masque quand l'utilisateur n'a pas touché au champ.
     if (patch.clientSecret === '********') delete patch.clientSecret
     this.settings = { ...this.settings, ...patch }
     const { clientSecret, ...rest } = this.settings
@@ -121,11 +106,9 @@ class Store {
     return this.getPublicSettings()
   }
 
-  // -- jeton d'accès -------------------------------------------------------
-
   saveToken(token: { accessToken: string; expiresAt: number; battletag: string | null }): void {
     const enc = this.encrypt(JSON.stringify(token))
-    if (enc === null) return // chiffrement indisponible : jeton en mémoire seulement
+    if (enc === null) return
     fs.writeFileSync(this.tokenPath, enc, 'utf8')
   }
 
@@ -143,29 +126,35 @@ class Store {
     try {
       fs.rmSync(this.tokenPath, { force: true })
     } catch {
-      /* rien à nettoyer */
     }
   }
-
-  // -- données -------------------------------------------------------------
 
   private readData(): AppData {
     try {
       const raw = JSON.parse(fs.readFileSync(this.dataPath, 'utf8'))
-      return { ...structuredClone(DEFAULT_DATA), ...raw }
+      return this.migrate({ ...structuredClone(DEFAULT_DATA), ...raw })
     } catch {
       return structuredClone(DEFAULT_DATA)
     }
+  }
+
+  private migrate(data: AppData): AppData {
+    for (const report of Object.values(data.reports)) {
+      const legacy = report as unknown as { contentTag?: string }
+      if (!report.category) {
+        const detected = detectContent(legacy.contentTag || report.contentLabel || '')
+        report.category = detected.category
+        report.difficulty = detected.difficulty
+      }
+      delete legacy.contentTag
+    }
+    return data
   }
 
   getData(): AppData {
     return this.data
   }
 
-  /**
-   * Écriture atomique : on passe par un fichier temporaire puis un rename, pour
-   * qu'une coupure en plein export ne laisse pas un data.json tronqué.
-   */
   saveData(): void {
     const tmp = `${this.dataPath}.tmp`
     fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf8')

@@ -10,6 +10,7 @@ import type {
   SyncResult,
   WowInstall
 } from '@shared/types'
+import { contentKey, type ContentCategory, type RaidDifficulty } from '@shared/content'
 import { store } from './store'
 import { t } from './i18n'
 import { ensureIndex, journalStatus } from './journal'
@@ -26,10 +27,6 @@ import {
   refreshReport
 } from './raidbots'
 
-/**
- * Enveloppe uniforme : toute erreur du main revient au renderer sous forme
- * `{ ok: false, error }` plutôt que sous forme d'exception IPC illisible.
- */
 function handle<T>(channel: string, fn: (...args: any[]) => Promise<T> | T): void {
   ipcMain.handle(channel, async (_event, ...args) => {
     try {
@@ -40,13 +37,6 @@ function handle<T>(channel: string, fn: (...args: any[]) => Promise<T> | T): voi
   })
 }
 
-/**
- * Re-résout les libellés de tous les rapports enregistrés.
- *
- * Les noms d'objets et de boss sont figés dans le rapport au moment de
- * l'import : changer la langue des données ne suffit donc pas, il faut les
- * redemander à Blizzard.
- */
 async function refreshAllReports(): Promise<number> {
   const reports = Object.values(store.getData().reports)
   for (const report of reports) {
@@ -59,18 +49,34 @@ async function refreshAllReports(): Promise<number> {
   return reports.length
 }
 
-export function registerIpc(getWindow: () => BrowserWindow | null): void {
-  // -- réglages ------------------------------------------------------------
+function storeReport(report: DroptimizerReport): { replaced: boolean } {
+  const key = contentKey(report.category, report.difficulty)
+  let replaced = false
 
+  store.mutate((data) => {
+    for (const [id, existing] of Object.entries(data.reports)) {
+      if (
+        existing.characterId === report.characterId &&
+        contentKey(existing.category, existing.difficulty) === key &&
+        id !== report.reportId
+      ) {
+        delete data.reports[id]
+        replaced = true
+      }
+    }
+    data.reports[report.reportId] = report
+  })
+
+  return { replaced }
+}
+
+export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle<AppSettings>('settings:get', () => store.getPublicSettings())
 
   handle<AppSettings>('settings:save', (patch: Partial<AppSettings>) => {
     const previousLocale = store.getSettings().locale
     const saved = store.saveSettings(patch)
 
-    // Changer la langue des données rend les libellés déjà enregistrés
-    // obsolètes. On les rafraîchit en tâche de fond plutôt que de faire
-    // attendre l'enregistrement du réglage.
     if (patch.locale && patch.locale !== previousLocale) {
       void refreshAllReports()
         .then((count) => getWindow()?.webContents.send('reports:refreshed', count))
@@ -80,8 +86,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   handle<string>('settings:redirectUri', () => redirectUri(store.getSettings().oauthPort))
-
-  // -- authentification ----------------------------------------------------
 
   handle<AuthStatus>('auth:status', () => {
     const token = getToken()
@@ -102,16 +106,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return { connected: false, battletag: null, expiresAt: null }
   })
 
-  // -- données -------------------------------------------------------------
-
   handle<AppData>('data:get', () => store.getData())
 
   handle<SyncResult>('sync:all', async () => {
     const result = await syncAll(getWindow())
     flushItemCache()
     if (result.ok && store.getSettings().autoExport && store.getSettings().wowPath) {
-      // L'auto-export ne doit jamais faire échouer la synchro : on l'annonce
-      // au renderer sans propager l'erreur.
       const exported = exportToAddon()
       getWindow()?.webContents.send('export:auto', exported)
     }
@@ -119,8 +119,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   handle('sync:one', (id: string) => syncOne(id))
-
-  // -- gestion de la liste -------------------------------------------------
 
   handle<AppData>('char:toggleHidden', (id: string) =>
     store.mutate((data) => {
@@ -155,30 +153,38 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     })
   )
 
-  // -- droptimizer ---------------------------------------------------------
+  handle<DroptimizerReport>(
+    'report:importUrl',
+    async (
+      input: string,
+      characterId: string,
+      forced?: { category: ContentCategory; difficulty: RaidDifficulty | null }
+    ) => {
+      const reportId = extractReportId(input)
+      if (!reportId) throw new Error(t('err.badReportLink'))
+      const raw = await fetchReport(reportId)
+      const report = await buildReport(raw, reportId, characterId, forced)
+      flushItemCache()
+      storeReport(report)
+      return report
+    }
+  )
 
-  handle<DroptimizerReport>('report:importUrl', async (input: string, characterId: string) => {
-    const reportId = extractReportId(input)
-    if (!reportId) throw new Error(t('err.badReportLink'))
-    const raw = await fetchReport(reportId)
-    const report = await buildReport(raw, reportId, characterId)
-    flushItemCache()
-    store.mutate((data) => {
-      data.reports[report.reportId] = report
-    })
-    return report
-  })
-
-  handle<DroptimizerReport>('report:importJson', async (text: string, characterId: string) => {
-    const raw = parseRawJson(text)
-    const reportId = `local-${Date.now().toString(36)}`
-    const report = await buildReport(raw, reportId, characterId)
-    flushItemCache()
-    store.mutate((data) => {
-      data.reports[report.reportId] = report
-    })
-    return report
-  })
+  handle<DroptimizerReport>(
+    'report:importJson',
+    async (
+      text: string,
+      characterId: string,
+      forced?: { category: ContentCategory; difficulty: RaidDifficulty | null }
+    ) => {
+      const raw = parseRawJson(text)
+      const reportId = `local-${Date.now().toString(36)}`
+      const report = await buildReport(raw, reportId, characterId, forced)
+      flushItemCache()
+      storeReport(report)
+      return report
+    }
+  )
 
   handle<number>('report:refreshAll', () => refreshAllReports())
 
@@ -188,14 +194,16 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     })
   )
 
-  handle<AppData>('report:retag', (reportId: string, tag: string) =>
-    store.mutate((data) => {
-      const report = data.reports[reportId]
-      if (report) report.contentTag = tag.trim() || report.contentLabel
-    })
-  )
+  handle<AppData>(
+    'report:recategorize',
+    (reportId: string, category: ContentCategory, difficulty: RaidDifficulty | null) => {
+      const report = store.getData().reports[reportId]
+      if (!report) return store.getData()
 
-  // -- installation WoW ----------------------------------------------------
+      storeReport({ ...report, category, difficulty })
+      return store.getData()
+    }
+  )
 
   handle<WowInstall[]>('wow:detect', () => detectInstalls())
 
@@ -220,8 +228,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     const normalized = normalizeWowRoot(input)
     if (!normalized) throw new Error(t('err.badPath'))
     const flavors = flavorsIn(normalized)
-    // On ne conserve la saveur choisie que si elle existe dans cette
-    // installation ; sinon on retombe sur la première disponible.
+
     const current = store.getSettings().wowFlavor
     store.saveSettings({
       wowPath: normalized,
@@ -230,16 +237,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return { path: normalized, flavors }
   })
 
-  // -- index du butin ------------------------------------------------------
-
   handle<JournalStatus>('journal:status', () => journalStatus())
 
   handle<JournalStatus>('journal:rebuild', async () => {
     await ensureIndex(true)
     return journalStatus()
   })
-
-  // -- export --------------------------------------------------------------
 
   handle<ExportResult>('export:run', () => exportToAddon())
 
@@ -259,10 +262,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return exportToFile(result.filePath)
   })
 
-  // -- système -------------------------------------------------------------
-
   handle('shell:openExternal', (url: string) => {
-    // Liste blanche : on n'ouvre que du http(s), jamais un chemin local arbitraire.
     if (!/^https?:\/\//i.test(url)) throw new Error(t('err.urlRefused'))
     return shell.openExternal(url)
   })

@@ -8,7 +8,6 @@ const AUTHORIZE_URL = 'https://oauth.battle.net/authorize'
 const TOKEN_URL = 'https://oauth.battle.net/token'
 const USERINFO_URL = 'https://oauth.battle.net/userinfo'
 
-/** Le seul scope nécessaire : il donne accès à /profile/user/wow. */
 const SCOPE = 'wow.profile'
 
 export interface StoredToken {
@@ -44,14 +43,6 @@ h1{margin:0 0 8px;font-size:19px;color:${accent}}p{margin:0;color:#9aa4b2}
 </style></head><body><div class="card"><h1>${title}</h1><p>${message}</p></div></body></html>`
 }
 
-/**
- * Flux Authorization Code sur boucle locale.
- *
- * Battle.net exige un client confidentiel (client_secret à l'échange), donc pas
- * de PKCE seul : l'utilisateur crée son propre client sur develop.battle.net et
- * renseigne l'ID + le secret dans les réglages. Rien n'est transmis ailleurs
- * qu'à Blizzard.
- */
 export async function authorize(): Promise<StoredToken> {
   const settings = store.getSettings()
   if (!settings.clientId || !settings.clientSecret) {
@@ -100,7 +91,6 @@ export async function authorize(): Promise<StoredToken> {
       )
     })
 
-    // 127.0.0.1 seulement : le serveur ne doit jamais être joignable depuis le réseau.
     server.listen(port, '127.0.0.1', () => {
       const params = new URLSearchParams({
         client_id: settings.clientId,

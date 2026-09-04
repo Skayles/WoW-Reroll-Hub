@@ -1,23 +1,9 @@
---[[
-  Reroll Helper — noyau
-
-  L'addon ne collecte rien lui-même : il se contente de lire la table
-  RerollHelperData écrite par l'application WoW Reroll Hub dans
-  Data/Export.lua. C'est ce qui permet d'avoir tous ses persos sous les yeux
-  sans s'être connecté sur chacun.
-]]
-
 local ADDON_NAME, RH = ...
 _G.RerollHelper = RH
 
 RH.SCHEMA = 2
 RH.VERSION = C_AddOns and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "0.1.0"
 
--- ---------------------------------------------------------------------------
--- Accès aux données exportées
--- ---------------------------------------------------------------------------
-
---- Renvoie la table exportée, ou nil si l'export n'a jamais été fait.
 function RH:GetExport()
 	local data = _G.RerollHelperData
 	if type(data) ~= "table" or type(data.characters) ~= "table" then
@@ -26,7 +12,6 @@ function RH:GetExport()
 	return data
 end
 
---- Message d'état affiché quand les données sont absentes ou périmées.
 function RH:GetDataStatus()
 	local L = self.L
 	local data = self:GetExport()
@@ -46,11 +31,6 @@ function RH:GetDataStatus()
 	return "ok", nil
 end
 
--- ---------------------------------------------------------------------------
--- Helpers d'affichage
--- ---------------------------------------------------------------------------
-
---- Couleur de classe à partir du classId Blizzard, avec repli neutre.
 function RH:ClassColor(classId)
 	local info = classId and C_CreatureInfo and C_CreatureInfo.GetClassInfo(classId)
 	local color = info and RAID_CLASS_COLORS[info.classFile]
@@ -65,18 +45,17 @@ function RH:ClassHex(classId)
 	return ("|cff%02x%02x%02x"):format(r * 255, g * 255, b * 255)
 end
 
---- Colore un ilvl selon son écart au meilleur ilvl du compte.
 function RH:IlvlColor(ilvl, best)
 	if not best or best <= 0 then
 		return 1, 1, 1
 	end
 	local ratio = ilvl / best
 	if ratio >= 0.99 then
-		return 0.44, 0.81, 0.54 -- vert : au niveau du main
+		return 0.44, 0.81, 0.54
 	elseif ratio >= 0.94 then
-		return 0.94, 0.78, 0.45 -- ambre : rattrapable
+		return 0.94, 0.78, 0.45
 	end
-	return 0.85, 0.42, 0.42 -- rouge : gros retard
+	return 0.85, 0.42, 0.42
 end
 
 function RH:RoleLabel(role)
@@ -100,10 +79,6 @@ function RH:FormatDate(timestamp)
 	return date("%d/%m/%Y %H:%M", timestamp)
 end
 
--- ---------------------------------------------------------------------------
--- Tri et sélection
--- ---------------------------------------------------------------------------
-
 local SORTERS = {
 	ilvl = function(a, b)
 		return (a.ilvl or 0) > (b.ilvl or 0)
@@ -121,7 +96,6 @@ local SORTERS = {
 	end,
 }
 
---- Liste des persos triée selon le mode courant.
 function RH:GetSortedCharacters(sortKey)
 	local data = self:GetExport()
 	if not data then
@@ -134,8 +108,7 @@ function RH:GetSortedCharacters(sortKey)
 	end
 
 	local sorter = SORTERS[sortKey or "ilvl"] or SORTERS.ilvl
-	-- Départage systématique par nom : sans ça, l'ordre de deux persos à ilvl
-	-- égal change à chaque tri et la liste "saute" visuellement.
+
 	table.sort(list, function(a, b)
 		if sorter(a, b) then
 			return true
@@ -158,10 +131,6 @@ function RH:GetBestIlvl()
 	return best
 end
 
--- ---------------------------------------------------------------------------
--- Persistance locale (position de fenêtre, dernier tri)
--- ---------------------------------------------------------------------------
-
 local DEFAULTS = {
 	sort = "ilvl",
 	selected = nil,
@@ -181,10 +150,6 @@ local function ApplyDefaults(target, defaults)
 	end
 end
 
--- ---------------------------------------------------------------------------
--- Chargement
--- ---------------------------------------------------------------------------
-
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
 loader:SetScript("OnEvent", function(_, _, loadedAddon)
@@ -196,8 +161,6 @@ loader:SetScript("OnEvent", function(_, _, loadedAddon)
 	ApplyDefaults(RerollHelperDB, DEFAULTS)
 	RH.db = RerollHelperDB
 
-	-- La locale se charge avant toute lecture des donnees : GetDataStatus et
-	-- les libelles en dependent.
 	RH:LoadLocale()
 
 	local status, message = RH:GetDataStatus()
@@ -212,10 +175,6 @@ loader:SetScript("OnEvent", function(_, _, loadedAddon)
 
 	loader:UnregisterEvent("ADDON_LOADED")
 end)
-
--- ---------------------------------------------------------------------------
--- Commandes
--- ---------------------------------------------------------------------------
 
 SLASH_REROLLHELPER1 = "/rh"
 SLASH_REROLLHELPER2 = "/reroll"
@@ -242,6 +201,7 @@ SlashCmdList["REROLLHELPER"] = function(input)
 		print("|cff5ac8fa" .. RH.L.title .. "|r — " .. RH.L.helpHeader)
 		print(RH.L.helpToggle)
 		print(RH.L.helpStatus)
+		print("|cff6b7484" .. RH.L.disclaimer .. "|r")
 		return
 	end
 

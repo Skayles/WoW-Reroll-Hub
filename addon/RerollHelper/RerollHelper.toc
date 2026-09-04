@@ -1,14 +1,13 @@
 ## Interface: 120100
 ## Title: Reroll Helper
-## Notes: Récapitulatif de tous les personnages du compte, exporté depuis WoW Reroll Hub.
-## Notes-frFR: Récapitulatif de tous les personnages du compte, exporté depuis WoW Reroll Hub.
+## Notes: Roster summary exported from the WoW Reroll Hub desktop app. Passive display only. Built with AI assistance - see the project page.
+## Notes-frFR: Récapitulatif du roster exporté depuis l'application WoW Reroll Hub. Affichage passif uniquement. Réalisé avec l'aide de l'IA - voir la page du projet.
 ## Author: Skayles
 ## Version: 0.1.0
 ## SavedVariables: RerollHelperDB
 ## IconTexture: Interface\ICONS\INV_Misc_GroupLooking
 ## X-Website: https://github.com/Skayles/WoW-Reroll-Hub
 
-# Données générées par l'application : ce fichier est écrasé à chaque export.
 Data\Export.lua
 
 Locale.lua

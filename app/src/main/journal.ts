@@ -5,29 +5,13 @@ import type { JournalStatus } from '@shared/types'
 import { apiGet, localized } from './blizzard'
 import { store } from './store'
 
-/**
- * Index « objet → boss qui le fait tomber », construit depuis le journal des
- * aventures de Blizzard (`/data/wow/journal-*`).
- *
- * C'est la seule source officielle qui relie un identifiant d'objet à sa
- * rencontre. Le nom de profileset d'un rapport Raidbots ne la contient pas de
- * façon fiable, et son format a déjà changé plusieurs fois.
- *
- * La construction coûte une centaine de requêtes, donc elle est faite une fois
- * puis mise en cache sur disque. Seules les deux dernières extensions sont
- * indexées : un droptimizer porte sur le contenu courant, et tout indexer
- * multiplierait le coût par dix pour des objets que personne ne farm.
- */
-
 const EXPANSIONS_TO_INDEX = 2
 
-/** Au-delà, le contenu a probablement changé : on reconstruit. */
 const MAX_AGE_MS = 30 * 24 * 3600 * 1000
 
 export interface LootSource {
-  /** Donjon ou raid. */
   instance: string
-  /** Nom de la rencontre. */
+
   boss: string
 }
 
@@ -66,7 +50,6 @@ export function journalStatus(): JournalStatus {
   }
 }
 
-/** True si l'index manque, a changé de langue/région, ou a trop vieilli. */
 function isStale(current: JournalCache | null): boolean {
   if (!current) return true
   const settings = store.getSettings()
@@ -74,10 +57,6 @@ function isStale(current: JournalCache | null): boolean {
   return Date.now() - current.builtAt > MAX_AGE_MS
 }
 
-/**
- * Renvoie l'index, en le construisant si nécessaire.
- * Les appels concurrents partagent la même construction.
- */
 export async function ensureIndex(force = false): Promise<JournalCache> {
   const current = load()
   if (!force && current && !isStale(current)) return current
@@ -89,7 +68,6 @@ export async function ensureIndex(force = false): Promise<JournalCache> {
       try {
         fs.writeFileSync(cachePath(), JSON.stringify(built), 'utf8')
       } catch {
-        // L'index reste utilisable en mémoire même si le disque refuse.
       }
       return built
     })
@@ -100,15 +78,10 @@ export async function ensureIndex(force = false): Promise<JournalCache> {
   return building
 }
 
-/** Cherche la source d'un objet sans jamais déclencher de construction. */
 export function lookup(itemId: number): LootSource | null {
   const current = load()
   return current?.items[String(itemId)] ?? null
 }
-
-// ---------------------------------------------------------------------------
-// Construction
-// ---------------------------------------------------------------------------
 
 interface ExpansionIndexResponse {
   tiers?: { id: number; name?: unknown }[]
@@ -137,7 +110,6 @@ async function build(): Promise<JournalCache> {
     namespace: 'static'
   })
 
-  // Les extensions les plus récentes portent les identifiants les plus élevés.
   const tiers = (index?.tiers ?? [])
     .slice()
     .sort((a, b) => b.id - a.id)
@@ -154,8 +126,6 @@ async function build(): Promise<JournalCache> {
     }
   }
 
-  // Les instances sont traitées en parallèle : le limiteur de blizzard.ts
-  // plafonne déjà la concurrence réseau à 8.
   await Promise.all(
     instanceIds.map(async (instanceId) => {
       const instance = await apiGet<InstanceResponse>(
@@ -178,8 +148,7 @@ async function build(): Promise<JournalCache> {
           for (const entry of encounter.items ?? []) {
             const id = entry.item?.id
             if (!id) continue
-            // Premier boss rencontré gagne : un objet listé sur plusieurs
-            // rencontres est rare, et la première reste une réponse correcte.
+
             if (!items[String(id)]) {
               items[String(id)] = { instance: instanceName, boss: bossName }
             }

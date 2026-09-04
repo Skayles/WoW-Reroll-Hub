@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type {
   CharacterDetail,
   CharacterFocus,
@@ -7,6 +7,16 @@ import type {
 } from '@shared/types'
 import { slotCapacity } from '@shared/slots'
 import { numberLocale } from '@shared/i18n'
+import {
+  CATEGORIES,
+  RAID_DIFFICULTIES,
+  contentKey,
+  contentLabelKey,
+  hasDifficulty,
+  type ContentCategory,
+  type RaidDifficulty
+} from '@shared/content'
+import { computeBySlot, reportsFor, type ContentScope } from '@shared/focus'
 import type { Hub } from '../state'
 
 interface Props {
@@ -21,19 +31,52 @@ type View = 'bySlot' | 'all'
 export default function Droptimizer({ hub, character, reports, focus }: Props): JSX.Element {
   const { t } = hub
   const nf = numberLocale(hub.settings?.language ?? 'fr')
+
   const [input, setInput] = useState('')
   const [jsonMode, setJsonMode] = useState(false)
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState<View>('bySlot')
+  const [category, setCategory] = useState<ContentCategory | 'TOTAL'>('TOTAL')
+  const [difficulty, setDifficulty] = useState<RaidDifficulty>('HEROIC')
+
+  const scope: ContentScope | null =
+    category === 'TOTAL'
+      ? null
+      : { category, difficulty: hasDifficulty(category) ? difficulty : null }
+
+  const scopedReports = useMemo(
+    () => reportsFor(reports, character.id, scope),
+    [reports, character.id, scope?.category, scope?.difficulty]
+  )
+
+  const scopedSlots = useMemo(
+    () => (scope ? computeBySlot(scopedReports) : focus.bySlot),
+    [scope?.category, scope?.difficulty, scopedReports, focus.bySlot]
+  )
+
+  const filled = useMemo(() => {
+    const keys = new Set<string>()
+    for (const report of reports) {
+      if (report.characterId === character.id) {
+        keys.add(contentKey(report.category, report.difficulty))
+      }
+    }
+    return keys
+  }, [reports, character.id])
+
+  const scopeLabel = scope
+    ? t(contentLabelKey(scope.category, scope.difficulty))
+    : t('tabs.total')
 
   const importReport = async (): Promise<void> => {
     if (!input.trim()) return
     setBusy(true)
+    const forced = scope ? { category: scope.category, difficulty: scope.difficulty } : undefined
     const result = await hub.run(
       () =>
         jsonMode
-          ? window.api.reports.importJson(input, character.id)
-          : window.api.reports.importUrl(input, character.id),
+          ? window.api.reports.importJson(input, character.id, forced)
+          : window.api.reports.importUrl(input, character.id, forced),
       t('dropt.imported')
     )
     setBusy(false)
@@ -47,7 +90,7 @@ export default function Droptimizer({ hub, character, reports, focus }: Props): 
         <span className="hint">{t('dropt.hint', { name: character.name })}</span>
       </h2>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
         {jsonMode ? (
           <textarea
             rows={4}
@@ -83,45 +126,92 @@ export default function Droptimizer({ hub, character, reports, focus }: Props): 
           {jsonMode ? t('dropt.mode.link') : t('dropt.mode.json')}
         </button>
       </div>
+      <p className="faint" style={{ marginTop: 0, marginBottom: 14 }}>
+        {scope ? t('dropt.importInto', { content: scopeLabel }) : t('dropt.importAuto')}
+      </p>
 
-      {focus.entries.length === 0 ? (
-        <p className="faint">{t('dropt.empty')}</p>
-      ) : (
-        <>
-          <div className="stack" style={{ gap: 8, marginBottom: 18 }}>
-            {focus.entries.map((entry, index) => (
-              <div className={`focus-card${index === 0 ? ' top' : ''}`} key={entry.contentTag}>
-                <div>
-                  <div className="rank">
-                    {index === 0 ? t('dropt.focus.first') : t('dropt.focus.rank', { rank: index + 1 })}
-                  </div>
-                  <div className="tag">{entry.contentTag}</div>
-                  <div className="faint">
-                    {t('dropt.focus.upgrades', { count: entry.upgradeCount })}
-                    {entry.bestItem
-                      ? ` · ${t('dropt.focus.best', { item: entry.bestItem.itemName })}`
-                      : ''}
-                  </div>
+      {focus.entries.length > 0 && (
+        <div className="stack" style={{ gap: 8, marginBottom: 18 }}>
+          {focus.entries.map((entry, index) => (
+            <div
+              className={`focus-card${index === 0 ? ' top' : ''}`}
+              key={contentKey(entry.category, entry.difficulty)}
+            >
+              <div>
+                <div className="rank">
+                  {index === 0
+                    ? t('dropt.focus.first')
+                    : t('dropt.focus.rank', { rank: index + 1 })}
                 </div>
-                <div className="gain">
-                  <b>+{entry.top3AvgPct.toFixed(2)}%</b>
-                  <div className="gain-dps">
-                    {t('dropt.gainDps', {
-                      value: Math.round(entry.top3AvgGain).toLocaleString(nf)
-                    })}
-                  </div>
-                  <div className="faint">{t('dropt.focus.top3')}</div>
-                  <div className="faint">
-                    {t('dropt.focus.peak', { value: entry.bestGainPct.toFixed(2) })} ·{' '}
-                    {t('dropt.gainDps', {
-                      value: Math.round(entry.bestGain).toLocaleString(nf)
-                    })}
-                  </div>
+                <div className="tag">{t(entry.labelKey)}</div>
+                <div className="faint">
+                  {t('dropt.focus.upgrades', { count: entry.upgradeCount })}
+                  {entry.bestItem
+                    ? ` · ${t('dropt.focus.best', { item: entry.bestItem.itemName })}`
+                    : ''}
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="gain">
+                <b>+{entry.top3AvgPct.toFixed(2)}%</b>
+                <div className="gain-dps">
+                  {t('dropt.gainDps', {
+                    value: Math.round(entry.top3AvgGain).toLocaleString(nf)
+                  })}
+                </div>
+                <div className="faint">{t('dropt.focus.top3')}</div>
+                <div className="faint">
+                  {t('dropt.focus.peak', { value: entry.bestGainPct.toFixed(2) })} ·{' '}
+                  {t('dropt.gainDps', { value: Math.round(entry.bestGain).toLocaleString(nf) })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
+      <div className="content-tabs">
+        <button
+          className={category === 'TOTAL' ? 'active' : ''}
+          onClick={() => setCategory('TOTAL')}
+        >
+          {t('tabs.total')}
+        </button>
+        {CATEGORIES.map((entry) => {
+          const occupied = hasDifficulty(entry)
+            ? RAID_DIFFICULTIES.some((d) => filled.has(contentKey(entry, d)))
+            : filled.has(contentKey(entry, null))
+          return (
+            <button
+              key={entry}
+              className={category === entry ? 'active' : ''}
+              onClick={() => setCategory(entry)}
+            >
+              {t(`content.${entry}`)}
+              {occupied && <i className="dot" />}
+            </button>
+          )
+        })}
+      </div>
+
+      {category !== 'TOTAL' && hasDifficulty(category) && (
+        <div className="content-tabs sub">
+          {RAID_DIFFICULTIES.map((entry) => (
+            <button
+              key={entry}
+              className={difficulty === entry ? 'active' : ''}
+              onClick={() => setDifficulty(entry)}
+            >
+              {t(`difficulty.${entry}`)}
+              {filled.has(contentKey('RAID', entry)) && <i className="dot" />}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {scopedReports.length === 0 ? (
+        <p className="faint">{t('tabs.empty', { content: scopeLabel })}</p>
+      ) : (
+        <>
           <div className="view-switch">
             <button
               className={view === 'bySlot' ? 'active' : ''}
@@ -135,9 +225,9 @@ export default function Droptimizer({ hub, character, reports, focus }: Props): 
           </div>
 
           {view === 'bySlot' ? (
-            <BySlot hub={hub} focus={focus} nf={nf} />
+            <BySlot hub={hub} slots={scopedSlots} nf={nf} showContent={scope === null} />
           ) : (
-            reports.map((report) => (
+            scopedReports.map((report) => (
               <ReportBlock key={report.reportId} hub={hub} report={report} nf={nf} />
             ))
           )}
@@ -147,22 +237,25 @@ export default function Droptimizer({ hub, character, reports, focus }: Props): 
   )
 }
 
-/**
- * Vue « une ligne par emplacement ».
- *
- * C'est la lecture utile d'un droptimizer : dix colliers concurrents ne servent
- * à rien quand un seul se porte. Les anneaux et bijoux gardent deux lignes,
- * puisque deux s'équipent.
- */
-function BySlot({ hub, focus, nf }: { hub: Hub; focus: CharacterFocus; nf: string }): JSX.Element {
+function BySlot({
+  hub,
+  slots,
+  nf,
+  showContent
+}: {
+  hub: Hub
+  slots: CharacterFocus['bySlot']
+  nf: string
+  showContent: boolean
+}): JSX.Element {
   const { t } = hub
-  const slots = focus.bySlot.filter((slot) => slot.upgrades.length > 0)
+  const visible = slots.filter((slot) => slot.upgrades.length > 0)
 
-  if (!slots.length) return <p className="faint">{t('dropt.bySlot.empty')}</p>
+  if (!visible.length) return <p className="faint">{t('dropt.bySlot.empty')}</p>
 
   return (
     <div>
-      {slots.map((slot) => {
+      {visible.map((slot) => {
         const capacity = slotCapacity(slot.slotGroup)
         return (
           <div className="slot-block" key={slot.slotGroup}>
@@ -178,7 +271,7 @@ function BySlot({ hub, focus, nf }: { hub: Hub; focus: CharacterFocus; nf: strin
                   key={`${upgrade.itemId}-${upgrade.itemName}`}
                   hub={hub}
                   upgrade={upgrade}
-                  content={upgrade.contentTag}
+                  content={showContent ? t(upgrade.labelKey) : undefined}
                   nf={nf}
                 />
               ))}
@@ -203,8 +296,6 @@ function UpgradeRow({
 }): JSX.Element {
   const { t } = hub
 
-  // Le boss est l'information qu'on vient chercher : il passe avant le nom de
-  // l'instance, qui n'est qu'un contexte.
   const source = upgrade.boss
     ? upgrade.instance
       ? `${upgrade.boss} — ${upgrade.instance}`
@@ -232,27 +323,55 @@ function UpgradeRow({
   )
 }
 
-function ReportBlock({ hub, report, nf }: { hub: Hub; report: DroptimizerReport; nf: string }): JSX.Element {
+function ReportBlock({
+  hub,
+  report,
+  nf
+}: {
+  hub: Hub
+  report: DroptimizerReport
+  nf: string
+}): JSX.Element {
   const { t } = hub
-  const [tag, setTag] = useState(report.contentTag)
   const [open, setOpen] = useState(false)
   const shown = open ? report.upgrades : report.upgrades.slice(0, 8)
+
+  const move = (category: ContentCategory, difficulty: RaidDifficulty | null): void => {
+    void hub.run(() => window.api.reports.recategorize(report.reportId, category, difficulty))
+  }
 
   return (
     <div>
       <div className="report-head">
         <div className="title">
-          <input
-            value={tag}
-            onChange={(e) => setTag(e.target.value)}
-            onBlur={() => {
-              if (tag !== report.contentTag) {
-                void hub.run(() => window.api.reports.retag(report.reportId, tag))
-              }
-            }}
-            title={t('dropt.report.tagHint')}
-          />
-          <div className="faint">
+          <div style={{ display: 'flex', gap: 6 }}>
+            <select
+              value={report.category}
+              onChange={(e) => {
+                const next = e.target.value as ContentCategory
+                move(next, hasDifficulty(next) ? report.difficulty ?? 'HEROIC' : null)
+              }}
+            >
+              {CATEGORIES.map((entry) => (
+                <option key={entry} value={entry}>
+                  {t(`content.${entry}`)}
+                </option>
+              ))}
+            </select>
+            {hasDifficulty(report.category) && (
+              <select
+                value={report.difficulty ?? 'HEROIC'}
+                onChange={(e) => move(report.category, e.target.value as RaidDifficulty)}
+              >
+                {RAID_DIFFICULTIES.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {t(`difficulty.${entry}`)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="faint" title={report.contentLabel}>
             {t('dropt.report.baseline', { dps: report.baselineDps.toLocaleString(nf) })} ·{' '}
             {report.fightStyle ?? t('dropt.report.style')}
             {report.targets ? ` · ${t('dropt.report.targets', { count: report.targets })}` : ''} ·{' '}
@@ -276,7 +395,12 @@ function ReportBlock({ hub, report, nf }: { hub: Hub; report: DroptimizerReport;
       ))}
 
       {shown.map((upgrade) => (
-        <UpgradeRow key={`${upgrade.itemId}-${upgrade.itemName}`} hub={hub} upgrade={upgrade} nf={nf} />
+        <UpgradeRow
+          key={`${upgrade.itemId}-${upgrade.itemName}`}
+          hub={hub}
+          upgrade={upgrade}
+          nf={nf}
+        />
       ))}
 
       {report.upgrades.length > 8 && (

@@ -222,6 +222,20 @@ export default function SettingsView({ hub }: { hub: Hub }): JSX.Element {
       </section>
 
       <section className="panel">
+        <h2>{t('settings.about')}</h2>
+        <p className="faint" style={{ marginTop: 0 }}>
+          {t('settings.disclaimer')}
+        </p>
+        <a
+          onClick={() =>
+            void window.api.system.openExternal('https://github.com/Skayles/WoW-Reroll-Hub')
+          }
+        >
+          {t('settings.repo')}
+        </a>
+      </section>
+
+      <section className="panel">
         <h2>{t('settings.journal')}</h2>
         <p className="faint" style={{ marginTop: 0 }}>
           {t('settings.journal.desc')}
@@ -251,8 +265,6 @@ export default function SettingsView({ hub }: { hub: Hub }): JSX.Element {
               placeholder="C:\Program Files (x86)\World of Warcraft"
               onChange={(e) => setWowPath(e.target.value)}
               onBlur={() => {
-                // Validé seulement à la sortie du champ : chaque frappe
-                // déclencherait sinon une écriture disque et un rechargement.
                 if (wowPath.trim() && wowPath !== settings.wowPath) {
                   void hub.run(() => window.api.wow.setPath(wowPath))
                 }

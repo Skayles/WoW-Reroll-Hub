@@ -1,11 +1,3 @@
---[[
-  Reroll Helper — interface
-
-  Fenêtre en deux colonnes : la liste de tous les persos du compte à gauche,
-  le détail du perso sélectionné à droite (focus conseillé, objets prioritaires,
-  correctifs). Aucune donnée n'est lue depuis le jeu : tout vient de l'export.
-]]
-
 local ADDON_NAME, RH = ...
 
 local WIDTH, HEIGHT = 860, 560
@@ -20,10 +12,6 @@ local COLOR_ORANGE = "|cfff0a35e"
 local R = "|r"
 
 local frame, listChild, detail, rows, sortButtons
-
--- ---------------------------------------------------------------------------
--- Construction
--- ---------------------------------------------------------------------------
 
 local function StyleBackdrop(target, r, g, b, a)
 	target:SetBackdrop({
@@ -111,12 +99,11 @@ local function BuildFrame()
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
-		-- On mémorise la position pour la restaurer à la prochaine ouverture.
+
 		local point, _, relativePoint, x, y = self:GetPoint()
 		RH.db.point = { point, nil, relativePoint, x, y }
 	end)
 
-	-- Fermeture à Échap, comportement attendu de toute fenêtre d'addon.
 	tinsert(UISpecialFrames, "RerollHelperFrame")
 
 	local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -133,7 +120,6 @@ local function BuildFrame()
 		frame:Hide()
 	end)
 
-	-- Colonne gauche : tri + liste défilante.
 	local listPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	listPanel:SetPoint("TOPLEFT", 12, -52)
 	listPanel:SetSize(LIST_WIDTH, HEIGHT - 66)
@@ -157,7 +143,6 @@ local function BuildFrame()
 
 	rows = {}
 
-	-- Colonne droite : détail du perso sélectionné.
 	local detailPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	detailPanel:SetPoint("TOPLEFT", listPanel, "TOPRIGHT", 12, 0)
 	detailPanel:SetPoint("BOTTOMRIGHT", -12, 14)
@@ -196,15 +181,10 @@ local function BuildFrame()
 	frame:Hide()
 end
 
--- ---------------------------------------------------------------------------
--- Rendu
--- ---------------------------------------------------------------------------
-
 local function RenderList()
 	local characters = RH:GetSortedCharacters(RH.db.sort)
 	local best = RH:GetBestIlvl()
 
-	-- Aucun perso sélectionné (premier lancement, ou perso disparu de l'export).
 	local selectedExists = false
 	for _, character in ipairs(characters) do
 		if character.id == RH.db.selected then
@@ -274,7 +254,6 @@ local function BuildDetailText(character)
 		lines[#lines + 1] = text or ""
 	end
 
-	-- Contenu à focus : c'est l'information qui motive tout l'addon.
 	add(COLOR_ACCENT .. L.focusHeader .. R)
 	if character.contents and #character.contents > 0 then
 		for index, content in ipairs(character.contents) do
@@ -282,7 +261,7 @@ local function BuildDetailText(character)
 			local avgGain = RH:FormatGain(content.top3AvgGain)
 			add(("%s%s  %s%s%s%s  %s%s%s"):format(
 				prefix,
-				content.tag or "?",
+				RH:ContentName(content.category, content.difficulty),
 				COLOR_GREEN,
 				RH:FormatPercent(content.top3AvgPct),
 				avgGain and (" (" .. avgGain .. ")") or "",
@@ -297,8 +276,6 @@ local function BuildDetailText(character)
 	end
 	add("")
 
-	-- Meilleure pièce par emplacement : une ligne de slot, puis ses objets avec
-	-- le boss qui les fait tomber. C'est la vue directement actionnable en jeu.
 	if character.bySlot and #character.bySlot > 0 then
 		add(COLOR_ACCENT .. L.bySlotHeader .. R)
 		for _, slot in ipairs(character.bySlot) do
@@ -326,7 +303,8 @@ local function BuildDetailText(character)
 					gain and (" (" .. gain .. ")") or "",
 					R
 				))
-				add(("         %s%s%s"):format(COLOR_FAINT, source, R))
+				local origin = RH:ContentName(item.category, item.difficulty)
+				add(("         %s%s · %s%s"):format(COLOR_FAINT, source, origin, R))
 			end
 		end
 		add("")
@@ -413,7 +391,7 @@ local function RenderDetail()
 
 	local text = BuildDetailText(character)
 	detail.body:SetText(text)
-	-- La hauteur du contenu doit suivre le texte, sinon le défilement est bloqué.
+
 	detail.bodyChild:SetHeight(math.max(detail.body:GetStringHeight() + 10, 40))
 end
 
