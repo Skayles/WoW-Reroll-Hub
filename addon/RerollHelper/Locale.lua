@@ -7,7 +7,7 @@ translations.en = {
 	loaded = "%d characters loaded (export from %s). Type /rh.",
 
 	noData = "No data exported yet. Open WoW Reroll Hub, sync your account, then click \"Export now\".",
-	badSchema = "Incompatible data format (file v%d, addon v%d). Update the application and the addon together.",
+	badSchema = "Incompatible data format (file v%d, addon v%d). Update WoW Reroll Hub to the latest version, then export again.",
 	stale = "Data is %d days old — consider resyncing.",
 	staleShort = "(outdated data)",
 	summary = "%d characters · exported %s",
@@ -96,7 +96,7 @@ translations.fr = {
 	loaded = "%d personnages chargés (export du %s). Tape /rh.",
 
 	noData = "Aucune donnée exportée. Ouvre WoW Reroll Hub, synchronise ton compte puis clique sur « Exporter maintenant ».",
-	badSchema = "Format de données incompatible (fichier v%d, addon v%d). Mets à jour l'application et l'addon ensemble.",
+	badSchema = "Format de données incompatible (fichier v%d, addon v%d). Mets à jour WoW Reroll Hub puis relance un export.",
 	stale = "Données vieilles de %d jours — pense à resynchroniser.",
 	staleShort = "(données anciennes)",
 	summary = "%d personnages · export du %s",

@@ -9,10 +9,11 @@
   "scripts": {
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
-    "build": "electron-vite build",
+    "build": "npm run check-schema && electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "dist": "electron-vite build && electron-builder --win --publish never",
-    "make-icon": "node scripts/make-icon.mjs"
+    "dist": "npm run check-schema && electron-vite build && electron-builder --win --publish never",
+    "make-icon": "node scripts/make-icon.mjs",
+    "check-schema": "node scripts/check-schema.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.7.5",
