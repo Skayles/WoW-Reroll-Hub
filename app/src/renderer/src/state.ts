@@ -86,9 +86,20 @@ export function useHub(): Hub {
       )
     })
 
+    const offRefresh = window.api.reports.onRefreshed((count) => {
+      const translate = translator(settingsRef.current?.language ?? 'fr')
+      setBanner(
+        count >= 0
+          ? { kind: 'ok', text: translate('reports.refreshed', { count }) }
+          : { kind: 'error', text: translate('reports.refreshFailed') }
+      )
+      void reload()
+    })
+
     return () => {
       offProgress()
       offExport()
+      offRefresh()
     }
   }, [reload])
 

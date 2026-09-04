@@ -5,6 +5,7 @@ import type { DroptimizerReport, DroptimizerUpgrade } from '@shared/types'
 import { groupForInventoryType, type SlotGroup } from '@shared/slots'
 import { apiGet, localized } from './blizzard'
 import { ensureIndex, lookup } from './journal'
+import { store as settingsStore } from './store'
 import { t } from './i18n'
 
 /**
@@ -165,6 +166,41 @@ export async function buildReport(
   }
 }
 
+/**
+ * Re-résout noms d'objets, emplacements et sources d'un rapport déjà importé.
+ *
+ * Les libellés sont figés dans le rapport au moment de l'import : sans ça, un
+ * changement de langue laisserait des noms français dans une interface
+ * anglaise. Les gains, eux, ne sont pas recalculés — ils ne dépendent pas de
+ * la langue.
+ */
+export async function refreshReport(report: DroptimizerReport): Promise<DroptimizerReport> {
+  try {
+    await ensureIndex()
+  } catch {
+    // Sans index, on met quand même les noms à jour.
+  }
+
+  const upgrades: DroptimizerUpgrade[] = []
+  for (const upgrade of report.upgrades) {
+    if (!upgrade.itemId) {
+      upgrades.push(upgrade)
+      continue
+    }
+    const meta = await resolveItem(upgrade.itemId)
+    const source = lookup(upgrade.itemId)
+    upgrades.push({
+      ...upgrade,
+      itemName: meta?.name || upgrade.itemName,
+      slotGroup: meta?.slotGroup ?? upgrade.slotGroup,
+      instance: source?.instance ?? upgrade.instance,
+      boss: source?.boss ?? upgrade.boss
+    })
+  }
+
+  return { ...report, upgrades }
+}
+
 // ---------------------------------------------------------------------------
 // Heuristiques sur le nom de profileset
 // ---------------------------------------------------------------------------
@@ -208,7 +244,11 @@ function loadCache(): Record<string, ItemMeta | null> {
   // incompatible avec les groupes normalisés. Le renommer l'invalide proprement.
   cachePath = path.join(app.getPath('userData'), 'item-cache-v2.json')
   try {
-    cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'))
+    const raw = JSON.parse(fs.readFileSync(cachePath, 'utf8')) as Record<string, ItemMeta | null>
+    // Les entrées de l'ancien format n'ont pas de préfixe de locale : elles ne
+    // seront jamais relues, autant ne pas les traîner indéfiniment.
+    cache = Object.fromEntries(Object.entries(raw).filter(([key]) => key.includes(':')))
+    if (Object.keys(cache).length !== Object.keys(raw).length) cacheDirty = true
   } catch {
     cache = {}
   }
@@ -230,10 +270,20 @@ interface ItemResponse {
   inventory_type?: { type: string; name?: unknown }
 }
 
+/**
+ * Les noms d'objets sont localisés : la clé de cache doit inclure la locale,
+ * sinon un nom mis en cache en français ressort en français même après un
+ * passage en anglais. Garder les deux permet aussi de basculer d'une langue à
+ * l'autre sans redemander les objets déjà connus.
+ */
+function cacheKey(itemId: number): string {
+  return `${settingsStore.getSettings().locale}:${itemId}`
+}
+
 async function resolveItem(itemId: number): Promise<ItemMeta | null> {
-  const store = loadCache()
-  const key = String(itemId)
-  if (key in store) return store[key]
+  const cacheMap = loadCache()
+  const key = cacheKey(itemId)
+  if (key in cacheMap) return cacheMap[key]
 
   try {
     const item = await apiGet<ItemResponse>(`/data/wow/item/${itemId}`, {
@@ -246,7 +296,7 @@ async function resolveItem(itemId: number): Promise<ItemMeta | null> {
           slotGroup: groupForInventoryType(item.inventory_type?.type)
         }
       : null
-    store[key] = meta
+    cacheMap[key] = meta
     cacheDirty = true
     return meta
   } catch {

@@ -58,7 +58,13 @@ const api = {
     importJson: (text: string, characterId: string) =>
       call<DroptimizerReport>('report:importJson', text, characterId),
     remove: (reportId: string) => call<AppData>('report:remove', reportId),
-    retag: (reportId: string, tag: string) => call<AppData>('report:retag', reportId, tag)
+    retag: (reportId: string, tag: string) => call<AppData>('report:retag', reportId, tag),
+    refreshAll: () => call<number>('report:refreshAll'),
+    onRefreshed: (handler: (count: number) => void) => {
+      const listener = (_e: unknown, count: number): void => handler(count)
+      ipcRenderer.on('reports:refreshed', listener)
+      return () => ipcRenderer.removeListener('reports:refreshed', listener)
+    }
   },
   wow: {
     detect: () => call<WowInstall[]>('wow:detect'),

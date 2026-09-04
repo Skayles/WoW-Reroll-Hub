@@ -573,7 +573,14 @@ const en: Dict = {
   'settings.account': 'Account and sync',
   'settings.region': 'Region',
   'settings.locale': 'Data language',
-  'settings.locale.desc': 'Language of item and realm names returned by Blizzard.',
+  'settings.locale.desc':
+    'Language of item, boss and realm names returned by Blizzard. Independent from the interface language: keep it on your WoW client language if you want the same names as in game.',
+  'settings.refreshNames': 'Refresh names',
+  'settings.refreshNames.desc':
+    'Asks Blizzard again for the names of already imported items. Runs automatically when you change the data language.',
+  'settings.refreshing': 'Refreshing…',
+  'reports.refreshed': 'Labels updated on {count} report{s}.',
+  'reports.refreshFailed': 'Could not refresh the report labels.',
   'settings.language': 'Application language',
   'settings.language.desc': 'Also applies to the addon on the next export.',
   'settings.minLevel': 'Minimum level',

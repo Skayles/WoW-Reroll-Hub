@@ -22,7 +22,8 @@ import {
   extractReportId,
   fetchReport,
   flushItemCache,
-  parseRawJson
+  parseRawJson,
+  refreshReport
 } from './raidbots'
 
 /**
@@ -39,14 +40,44 @@ function handle<T>(channel: string, fn: (...args: any[]) => Promise<T> | T): voi
   })
 }
 
+/**
+ * Re-résout les libellés de tous les rapports enregistrés.
+ *
+ * Les noms d'objets et de boss sont figés dans le rapport au moment de
+ * l'import : changer la langue des données ne suffit donc pas, il faut les
+ * redemander à Blizzard.
+ */
+async function refreshAllReports(): Promise<number> {
+  const reports = Object.values(store.getData().reports)
+  for (const report of reports) {
+    const refreshed = await refreshReport(report)
+    store.mutate((data) => {
+      data.reports[refreshed.reportId] = refreshed
+    })
+  }
+  flushItemCache()
+  return reports.length
+}
+
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
   // -- réglages ------------------------------------------------------------
 
   handle<AppSettings>('settings:get', () => store.getPublicSettings())
 
-  handle<AppSettings>('settings:save', (patch: Partial<AppSettings>) =>
-    store.saveSettings(patch)
-  )
+  handle<AppSettings>('settings:save', (patch: Partial<AppSettings>) => {
+    const previousLocale = store.getSettings().locale
+    const saved = store.saveSettings(patch)
+
+    // Changer la langue des données rend les libellés déjà enregistrés
+    // obsolètes. On les rafraîchit en tâche de fond plutôt que de faire
+    // attendre l'enregistrement du réglage.
+    if (patch.locale && patch.locale !== previousLocale) {
+      void refreshAllReports()
+        .then((count) => getWindow()?.webContents.send('reports:refreshed', count))
+        .catch(() => getWindow()?.webContents.send('reports:refreshed', -1))
+    }
+    return saved
+  })
 
   handle<string>('settings:redirectUri', () => redirectUri(store.getSettings().oauthPort))
 
@@ -148,6 +179,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     })
     return report
   })
+
+  handle<number>('report:refreshAll', () => refreshAllReports())
 
   handle<AppData>('report:remove', (reportId: string) =>
     store.mutate((data) => {

@@ -16,6 +16,7 @@ export default function SettingsView({ hub }: { hub: Hub }): JSX.Element {
   const [detecting, setDetecting] = useState(false)
   const [journal, setJournal] = useState<JournalStatus | null>(null)
   const [buildingIndex, setBuildingIndex] = useState(false)
+  const [refreshingNames, setRefreshingNames] = useState(false)
 
   useEffect(() => {
     if (!settings) return
@@ -178,16 +179,33 @@ export default function SettingsView({ hub }: { hub: Hub }): JSX.Element {
         </div>
         <div className="form-row">
           <label>{t('settings.locale')}</label>
-          <select
-            value={settings.locale}
-            onChange={(e) => void hub.saveSettings({ locale: e.target.value })}
-          >
-            {LOCALES[settings.region].map((locale) => (
-              <option key={locale} value={locale}>
-                {locale}
-              </option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select
+              value={settings.locale}
+              onChange={(e) => void hub.saveSettings({ locale: e.target.value })}
+            >
+              {LOCALES[settings.region].map((locale) => (
+                <option key={locale} value={locale}>
+                  {locale}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn"
+              disabled={refreshingNames}
+              onClick={async () => {
+                setRefreshingNames(true)
+                const count = await hub.run(() => window.api.reports.refreshAll())
+                if (count !== null) {
+                  hub.setBanner({ kind: 'ok', text: t('reports.refreshed', { count }) })
+                }
+                setRefreshingNames(false)
+              }}
+              title={t('settings.refreshNames.desc')}
+            >
+              {refreshingNames ? t('settings.refreshing') : t('settings.refreshNames')}
+            </button>
+          </div>
           <div className="desc">{t('settings.locale.desc')}</div>
         </div>
         <div className="form-row">
