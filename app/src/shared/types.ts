@@ -67,6 +67,7 @@ export interface GearItem {
 
   quality: string
   enchantment: string | null
+  enchantmentUrl: string | null
   sockets: number
   emptySockets: number
 

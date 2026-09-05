@@ -14,7 +14,7 @@ import { contentKey, type ContentCategory, type RaidDifficulty } from '@shared/c
 import { store } from './store'
 import { t } from './i18n'
 import { ensureIndex, journalStatus } from './journal'
-import { flushIconCache } from './media'
+import { backfillIcons, flushIconCache } from './media'
 import { authorize, clearToken, getToken, redirectUri } from './oauth'
 import { syncAll, syncOne } from './sync'
 import { detectInstalls, flavorsIn, normalizeWowRoot } from './wowPath'
@@ -192,6 +192,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   )
 
   handle<number>('report:refreshAll', () => refreshAllReports())
+
+  handle<number>('media:backfill', () => backfillIcons())
 
   handle<AppData>('report:remove', (reportId: string) =>
     store.mutate((data) => {

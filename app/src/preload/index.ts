@@ -78,6 +78,9 @@ const api = {
     browse: () => call<WowInstall | null>('wow:browse'),
     setPath: (input: string) => call<WowInstall>('wow:setPath', input)
   },
+  media: {
+    backfill: () => call<number>('media:backfill')
+  },
   journal: {
     status: () => call<JournalStatus>('journal:status'),
     rebuild: () => call<JournalStatus>('journal:rebuild')

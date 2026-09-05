@@ -65,6 +65,22 @@ export function useHub(): Hub {
     setAuth(nextAuth)
   }, [])
 
+  const backfilled = useRef(false)
+
+  useEffect(() => {
+    if (backfilled.current || !auth.connected || loading) return
+    backfilled.current = true
+    void window.api.media
+      .backfill()
+      .then((count) => {
+        if (count > 0) {
+          setBanner({ kind: 'ok', text: t('icons.filled', { count }) })
+          void reload()
+        }
+      })
+      .catch(() => undefined)
+  }, [auth.connected, loading, reload, t])
+
   useEffect(() => {
     void reload().finally(() => setLoading(false))
 

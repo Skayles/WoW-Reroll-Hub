@@ -275,6 +275,13 @@ const fr: Dict = {
   'settings.disclaimer':
     "WoW Reroll Hub et l'addon Reroll Helper ont été réalisés avec l'aide d'une IA (Claude), sous direction et relecture humaines. L'addon se contente d'afficher le fichier écrit par cette application : il ne collecte rien dans le jeu et n'envoie rien sur le réseau.",
   'settings.repo': 'Code source et suivi des problèmes',
+  'settings.icons': 'Icônes des objets',
+  'settings.icons.desc':
+    "Récupère les icônes manquantes des objets déjà enregistrés. Lancé automatiquement au démarrage ; ce bouton force un nouveau passage.",
+  'settings.icons.fetch': 'Récupérer les icônes',
+  'settings.icons.fetching': 'Récupération…',
+  'icons.filled': '{count} icônes récupérées.',
+  'icons.none': 'Aucune icône manquante.',
   'settings.journal': 'Index du butin',
   'settings.journal.desc':
     'Associe chaque objet simulé au donjon ou au boss qui le fait tomber, à partir du journal des aventures de Blizzard. Construit automatiquement au premier import de droptimizer.',
@@ -614,6 +621,13 @@ const en: Dict = {
   'settings.disclaimer':
     'WoW Reroll Hub and the Reroll Helper addon were built with help from an AI assistant (Claude), under human direction and review. The addon only displays the file written by this application: it collects nothing in game and sends nothing over the network.',
   'settings.repo': 'Source code and issue tracker',
+  'settings.icons': 'Item icons',
+  'settings.icons.desc':
+    'Fetches the missing icons of items already stored. Runs automatically at startup; this button forces another pass.',
+  'settings.icons.fetch': 'Fetch icons',
+  'settings.icons.fetching': 'Fetching…',
+  'icons.filled': '{count} icons fetched.',
+  'icons.none': 'No missing icon.',
   'settings.journal': 'Loot index',
   'settings.journal.desc':
     "Maps each simulated item to the dungeon or boss that drops it, using Blizzard's adventure journal. Built automatically on the first droptimizer import.",

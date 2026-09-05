@@ -18,7 +18,7 @@ import {
 } from '@shared/content'
 import { computeBySlot, reportsFor, type ContentScope } from '@shared/focus'
 import type { Hub } from '../state'
-import { ItemIcon } from '../views/CharacterView'
+import ItemIcon from './ItemIcon'
 
 interface Props {
   hub: Hub

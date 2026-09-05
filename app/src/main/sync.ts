@@ -51,7 +51,12 @@ interface EquipmentResponse {
     quality: { type: string }
     level?: { value: number }
     item_class?: { id: number }
-    enchantments?: { display_string?: unknown; enchantment_slot?: { type: string } }[]
+    enchantments?: {
+      display_string?: unknown
+      enchantment_id?: number
+      source_item?: { id: number; name?: unknown }
+      enchantment_slot?: { type: string }
+    }[]
     sockets?: { socket_type?: { type: string }; item?: { id: number } }[]
     set?: { item_set?: { id: number } }
   }[]
@@ -303,6 +308,15 @@ function parseGear(equipment: EquipmentResponse | null): GearItem[] {
     const enchantable =
       ENCHANTABLE_SLOTS.has(slot) && (slot !== 'OFF_HAND' || item.item_class?.id === 2)
 
+    const enchant = enchantments.length
+      ? parseEnchant(
+          localized(enchantments[0].display_string),
+          enchantments[0].source_item
+            ? { id: enchantments[0].source_item.id, name: localized(enchantments[0].source_item.name) }
+            : null
+        )
+      : null
+
     return {
       slot,
       itemId: item.item.id,
@@ -310,13 +324,46 @@ function parseGear(equipment: EquipmentResponse | null): GearItem[] {
       itemLevel: item.level?.value ?? 0,
       iconUrl: null,
       quality: item.quality.type,
-      enchantment: enchantments.length ? localized(enchantments[0].display_string) : null,
+      enchantment: enchant?.name ?? null,
+      enchantmentUrl: enchant?.url ?? null,
       sockets: sockets.length,
       emptySockets: sockets.filter((s) => !s.item).length,
       missingEnchant: enchantable && enchantments.length === 0,
       setBonusId: item.set?.item_set?.id ?? null
     }
   })
+}
+
+export function cleanEnchantText(value: string, withRank = true): string {
+  const tier = value.match(/Quality-Tier(\d)/i)?.[1]
+
+  const text = value
+    .replace(/\|A:[^|]*\|a/g, '')
+    .replace(/\|T[^|]*\|t/g, '')
+    .replace(/\|c[0-9a-fA-F]{8}/g, '')
+    .replace(/\|cn[A-Za-z0-9_]+:/g, '')
+    .replace(/\|r/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[^:]{1,24}:\s*/, '')
+    .trim()
+
+  if (!withRank) return text.replace(/\s*\(R\d\)\s*$/, '').trim()
+  return tier ? `${text} (R${tier})` : text
+}
+
+function parseEnchant(
+  displayString: string,
+  sourceItem: { id: number; name: string } | null
+): { name: string; url: string } | null {
+  const name = sourceItem?.name || cleanEnchantText(displayString)
+  if (!name) return null
+
+  const url = sourceItem
+    ? `https://www.wowhead.com/item=${sourceItem.id}`
+    : `https://www.wowhead.com/search?q=${encodeURIComponent(cleanEnchantText(displayString, false))}`
+
+  return { name, url }
 }
 
 function parseStats(stats: StatisticsResponse | null): CharacterStats | null {

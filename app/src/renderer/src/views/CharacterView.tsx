@@ -5,6 +5,7 @@ import { computeFocus, findWeakSlots } from '@shared/focus'
 import type { Translate } from '@shared/i18n'
 import type { Hub } from '../state'
 import Droptimizer from '../components/Droptimizer'
+import ItemIcon from '../components/ItemIcon'
 
 interface Props {
   hub: Hub
@@ -144,7 +145,19 @@ export default function CharacterView({ hub, character }: Props): JSX.Element {
                       {item.name || `#${item.itemId}`}
                     </a>
                   </div>
-                  {item.enchantment && <div className="faint">{item.enchantment}</div>}
+                  {item.enchantment &&
+                    (item.enchantmentUrl ? (
+                      <a
+                        className="faint enchant"
+                        onClick={() =>
+                          void window.api.system.openExternal(item.enchantmentUrl!)
+                        }
+                      >
+                        {item.enchantment}
+                      </a>
+                    ) : (
+                      <div className="faint">{item.enchantment}</div>
+                    ))}
                 </div>
                 <div className="flags">
                   {item.missingEnchant && (
@@ -285,21 +298,6 @@ export default function CharacterView({ hub, character }: Props): JSX.Element {
         </p>
       )}
     </div>
-  )
-}
-
-export function ItemIcon({
-  url,
-  quality
-}: {
-  url: string | null
-  quality?: string
-}): JSX.Element {
-  const border = quality ? qualityColor(quality) : 'var(--border-strong)'
-  return url ? (
-    <img className="item-icon" src={url} alt="" style={{ borderColor: border }} />
-  ) : (
-    <span className="item-icon empty" style={{ borderColor: border }} />
   )
 }
 

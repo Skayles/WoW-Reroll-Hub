@@ -464,6 +464,15 @@ a:hover {
   gap: 2px;
 }
 
+.enchant {
+  display: block;
+  color: var(--text-faint);
+}
+
+.enchant:hover {
+  color: var(--accent);
+}
+
 .item-icon {
   width: 26px;
   height: 26px;

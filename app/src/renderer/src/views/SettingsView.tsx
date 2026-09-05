@@ -17,6 +17,7 @@ export default function SettingsView({ hub }: { hub: Hub }): JSX.Element {
   const [journal, setJournal] = useState<JournalStatus | null>(null)
   const [buildingIndex, setBuildingIndex] = useState(false)
   const [refreshingNames, setRefreshingNames] = useState(false)
+  const [fetchingIcons, setFetchingIcons] = useState(false)
 
   useEffect(() => {
     if (!settings) return
@@ -233,6 +234,30 @@ export default function SettingsView({ hub }: { hub: Hub }): JSX.Element {
         >
           {t('settings.repo')}
         </a>
+      </section>
+
+      <section className="panel">
+        <h2>{t('settings.icons')}</h2>
+        <p className="faint" style={{ marginTop: 0 }}>
+          {t('settings.icons.desc')}
+        </p>
+        <button
+          className="btn"
+          disabled={fetchingIcons}
+          onClick={async () => {
+            setFetchingIcons(true)
+            const count = await hub.run(() => window.api.media.backfill())
+            if (count !== null) {
+              hub.setBanner({
+                kind: 'ok',
+                text: count > 0 ? t('icons.filled', { count }) : t('icons.none')
+              })
+            }
+            setFetchingIcons(false)
+          }}
+        >
+          {fetchingIcons ? t('settings.icons.fetching') : t('settings.icons.fetch')}
+        </button>
       </section>
 
       <section className="panel">

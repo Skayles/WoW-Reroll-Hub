@@ -127,7 +127,7 @@ Boss data comes from Blizzard's adventure journal (`/data/wow/journal-*`), the o
 
 **If a report has expired** (Raidbots purges free reports after a month): switch the field to **JSON** mode and paste the report's `data.json`, which you can download from the Raidbots page while it is still alive.
 
-Item names are resolved through the Blizzard API and cached per language. Changing the data language refreshes the labels of every stored report automatically.
+Enchants show their readable name with their quality rank, and link to Wowhead. Item names are resolved through the Blizzard API and cached per language. Changing the data language refreshes the labels of every stored report automatically.
 
 ## 6. Export to the addon
 

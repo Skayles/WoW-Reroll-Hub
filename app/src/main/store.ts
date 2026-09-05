@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { AppData, AppSettings } from '@shared/types'
 import { defaultLang } from '@shared/i18n'
 import { detectContent } from '@shared/content'
+import { cleanEnchantText } from './sync'
 
 const DEFAULT_SETTINGS: AppSettings = {
   clientId: '',
@@ -42,6 +43,8 @@ class Store {
     this.tokenPath = path.join(dir, 'token.bin')
     this.settings = this.readSettings()
     this.data = this.readData()
+
+    if (this.migrated) this.saveData()
 
     if (!fs.existsSync(this.settingsPath)) {
       this.settings.language = defaultLang(app.getLocale())
@@ -138,6 +141,8 @@ class Store {
     }
   }
 
+  private migrated = false
+
   private migrate(data: AppData): AppData {
     for (const report of Object.values(data.reports)) {
       const legacy = report as unknown as { contentTag?: string }
@@ -145,9 +150,28 @@ class Store {
         const detected = detectContent(legacy.contentTag || report.contentLabel || '')
         report.category = detected.category
         report.difficulty = detected.difficulty
+        this.migrated = true
       }
       delete legacy.contentTag
     }
+
+    for (const character of Object.values(data.characters)) {
+      for (const item of character.gear) {
+        if (!item.enchantment) continue
+
+        if (/\|[AcTr]/.test(item.enchantment)) {
+          item.enchantment = cleanEnchantText(item.enchantment) || null
+          this.migrated = true
+        }
+
+        if (item.enchantment && !item.enchantmentUrl) {
+          const query = cleanEnchantText(item.enchantment, false)
+          item.enchantmentUrl = `https://www.wowhead.com/search?q=${encodeURIComponent(query)}`
+          this.migrated = true
+        }
+      }
+    }
+
     return data
   }
 
