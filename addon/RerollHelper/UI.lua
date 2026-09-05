@@ -302,12 +302,30 @@ local function ItemRowEnter(self)
 	if not self.itemId or self.itemId == 0 then
 		return
 	end
+	local L = RH.L
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 	if self.itemLink then
 		GameTooltip:SetHyperlink(self.itemLink)
 	else
 		GameTooltip:SetItemByID(self.itemId)
 	end
+
+	GameTooltip:AddLine(" ")
+	GameTooltip:AddLine(L.tipHeader, 0.35, 0.78, 0.98)
+
+	if self.ilvl and self.ilvl > 0 then
+		GameTooltip:AddDoubleLine(L.tipLevel, tostring(self.ilvl), 0.6, 0.63, 0.69, 1, 1, 1)
+	end
+	if self.gainText then
+		GameTooltip:AddDoubleLine(L.bySlotHeader, self.gainText, 0.6, 0.63, 0.69, 0.44, 0.81, 0.54)
+	end
+	if self.source then
+		GameTooltip:AddLine(self.source, 0.6, 0.63, 0.69, true)
+	end
+	if self.ilvl and self.ilvl > 0 then
+		GameTooltip:AddLine(L.tipBase, 0.42, 0.45, 0.51, true)
+	end
+
 	GameTooltip:Show()
 end
 
@@ -407,6 +425,10 @@ local function BuildDetailLines(character)
 					itemId = item.itemId,
 					itemLink = RH:ItemLink(item),
 					ilvl = item.ilvl,
+					gainText = ("%s%s"):format(
+						RH:FormatPercent(item.gainPct),
+						RH:FormatGain(item.gain) and ("  " .. RH:FormatGain(item.gain)) or ""
+					),
 					name = item.name or "?",
 					source = source,
 					right = ("%s%s%s"):format(COLOR_GREEN, RH:FormatPercent(item.gainPct), R),
@@ -469,6 +491,9 @@ local function LayoutBody(lines)
 		local row = bodyRows[index] or CreateBodyRow(index)
 		row.itemId = nil
 		row.itemLink = nil
+		row.ilvl = nil
+		row.gainText = nil
+		row.source = nil
 		row.icon:Hide()
 		row.sub:Hide()
 		row.right:SetText("")
@@ -507,6 +532,9 @@ local function LayoutBody(lines)
 
 			row.itemId = line.itemId
 			row.itemLink = line.itemLink
+			row.ilvl = line.ilvl
+			row.gainText = line.gainText
+			row.source = line.source
 			row:EnableMouse(true)
 			itemRows[#itemRows + 1] = row
 			height = 33

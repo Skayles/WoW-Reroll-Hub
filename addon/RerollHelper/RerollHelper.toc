@@ -3,7 +3,7 @@
 ## Notes: Roster summary exported from the WoW Reroll Hub desktop app. Passive display only. Built with AI assistance - see the project page.
 ## Notes-frFR: Récapitulatif du roster exporté depuis l'application WoW Reroll Hub. Affichage passif uniquement. Réalisé avec l'aide de l'IA - voir la page du projet.
 ## Author: Skayles
-## Version: 0.2.1
+## Version: 0.2.2
 ## SavedVariables: RerollHelperDB
 ## IconTexture: Interface\ICONS\INV_Misc_GroupLooking
 ## X-Website: https://github.com/Skayles/WoW-Reroll-Hub

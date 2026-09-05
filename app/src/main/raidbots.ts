@@ -5,12 +5,12 @@ import type { DroptimizerReport, DroptimizerUpgrade } from '@shared/types'
 import { groupForInventoryType, type SlotGroup } from '@shared/slots'
 import { detectContent, type ContentCategory, type RaidDifficulty } from '@shared/content'
 import { apiGet, localized } from './blizzard'
-import { ensureIndex, lookup } from './journal'
+import { ensureIndex, lookup, resolveEncounter } from './journal'
 import { resolveIcon, resolveIcons } from './media'
 import { store as settingsStore } from './store'
 import { t } from './i18n'
 
-export const PARSER_VERSION = 2
+export const PARSER_VERSION = 3
 
 const REPORT_ID_RE = /^[A-Za-z0-9_-]{4,40}$/
 
@@ -89,7 +89,14 @@ export async function buildReport(
 
   const best = new Map<
     string,
-    { itemId: number | null; itemLevel: number | null; bonusIds: number[]; rawName: string; dps: number }
+    {
+      itemId: number | null
+      itemLevel: number | null
+      bonusIds: number[]
+      encounterId: number | null
+      rawName: string
+      dps: number
+    }
   >()
   for (const result of results) {
     const rawName = result.name ?? ''
@@ -103,6 +110,7 @@ export async function buildReport(
         itemId: parsed.itemId,
         itemLevel: parsed.itemLevel,
         bonusIds: parsed.bonusIds,
+        encounterId: parsed.encounterId,
         rawName,
         dps
       })
@@ -123,7 +131,9 @@ export async function buildReport(
   for (const entry of best.values()) {
     const gain = entry.dps - baselineDps
     const meta = entry.itemId !== null ? await resolveItem(entry.itemId) : null
-    const source = entry.itemId !== null ? lookup(entry.itemId) : null
+    const source =
+      (await resolveEncounter(entry.encounterId ?? 0)) ??
+      (entry.itemId !== null ? lookup(entry.itemId) : null)
     if (!source) unknownSources++
 
     upgrades.push({
@@ -207,6 +217,7 @@ interface ParsedName {
   itemId: number | null
   itemLevel: number | null
   bonusIds: number[]
+  encounterId: number | null
 }
 
 export function parseProfilesetName(rawName: string): ParsedName {
@@ -222,10 +233,16 @@ export function parseProfilesetName(rawName: string): ParsedName {
       .split(':')
       .map(Number)
       .filter((value) => Number.isInteger(value) && value > 0)
-    return { itemId, itemLevel, bonusIds }
+    const encounter = Number(segments[1])
+    return {
+      itemId,
+      itemLevel,
+      bonusIds,
+      encounterId: Number.isInteger(encounter) && encounter > 0 ? encounter : null
+    }
   }
 
-  return { itemId: guessItemId(rawName), itemLevel: null, bonusIds: [] }
+  return { itemId: guessItemId(rawName), itemLevel: null, bonusIds: [], encounterId: null }
 }
 
 export function wowheadItemUrl(

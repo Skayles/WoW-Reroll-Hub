@@ -5,7 +5,9 @@ import type { JournalStatus } from '@shared/types'
 import { apiGet, localized } from './blizzard'
 import { store } from './store'
 
-const EXPANSIONS_TO_INDEX = 2
+const EXPANSIONS_TO_INDEX = 99
+
+const INDEX_VERSION = 2
 
 const MAX_AGE_MS = 30 * 24 * 3600 * 1000
 
@@ -16,6 +18,7 @@ export interface LootSource {
 }
 
 interface JournalCache {
+  version?: number
   builtAt: number
   locale: string
   region: string
@@ -53,6 +56,7 @@ export function journalStatus(): JournalStatus {
 function isStale(current: JournalCache | null): boolean {
   if (!current) return true
   const settings = store.getSettings()
+  if (current.version !== INDEX_VERSION) return true
   if (current.locale !== settings.locale || current.region !== settings.region) return true
   return Date.now() - current.builtAt > MAX_AGE_MS
 }
@@ -76,6 +80,30 @@ export async function ensureIndex(force = false): Promise<JournalCache> {
     })
 
   return building
+}
+
+const encounterCache = new Map<number, LootSource | null>()
+
+export async function resolveEncounter(encounterId: number): Promise<LootSource | null> {
+  if (!encounterId || encounterId <= 0) return null
+  if (encounterCache.has(encounterId)) return encounterCache.get(encounterId) ?? null
+
+  try {
+    const encounter = await apiGet<{ name?: unknown; instance?: { name?: unknown } }>(
+      `/data/wow/journal-encounter/${encounterId}`,
+      { namespace: 'static', optional: true }
+    )
+    const source = encounter
+      ? {
+          instance: localized(encounter.instance?.name),
+          boss: localized(encounter.name)
+        }
+      : null
+    encounterCache.set(encounterId, source)
+    return source
+  } catch {
+    return null
+  }
 }
 
 export function lookup(itemId: number): LootSource | null {
@@ -159,6 +187,7 @@ async function build(): Promise<JournalCache> {
   )
 
   return {
+    version: INDEX_VERSION,
     builtAt: Date.now(),
     locale: settings.locale,
     region: settings.region,

@@ -88,6 +88,11 @@ async function reimportStaleReports(force = false): Promise<number> {
         category: report.category,
         difficulty: report.difficulty
       })
+
+      if (!rebuilt.upgrades.length && report.upgrades.length) {
+        throw new Error('rebuild vide')
+      }
+
       storeReport(rebuilt)
       done++
     } catch {
