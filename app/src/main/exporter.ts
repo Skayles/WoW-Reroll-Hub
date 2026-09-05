@@ -135,6 +135,8 @@ function serializeSlots(slots: SlotUpgrades[]): Record<string, unknown>[] {
         name: upgrade.itemName,
         gainPct: round2(upgrade.gainPct),
         gain: Math.round(upgrade.gain),
+        ilvl: upgrade.itemLevel ?? 0,
+        bonus: upgrade.bonusIds,
         category: upgrade.category,
         difficulty: upgrade.difficulty ?? '',
         instance: upgrade.instance ?? '',

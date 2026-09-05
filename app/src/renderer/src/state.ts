@@ -70,13 +70,17 @@ export function useHub(): Hub {
   useEffect(() => {
     if (backfilled.current || !auth.connected || loading) return
     backfilled.current = true
-    void window.api.media
-      .backfill()
-      .then((count) => {
-        if (count > 0) {
-          setBanner({ kind: 'ok', text: t('icons.filled', { count }) })
-          void reload()
+    void window.api.reports
+      .reimportStale()
+      .then((reimported) => {
+        if (reimported > 0) {
+          setBanner({ kind: 'ok', text: t('reports.reimported', { count: reimported }) })
         }
+        return window.api.media.backfill()
+      })
+      .then((count) => {
+        if (count > 0) setBanner({ kind: 'ok', text: t('icons.filled', { count }) })
+        void reload()
       })
       .catch(() => undefined)
   }, [auth.connected, loading, reload, t])

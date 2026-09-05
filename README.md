@@ -44,8 +44,8 @@ Two files land in `app/release/`:
 
 | File | Use |
 | --- | --- |
-| `WoW-Reroll-Hub-Setup-0.2.0.exe` | **Installer.** Installs for the current user (no admin rights needed), creates a desktop shortcut and a Start menu entry, and registers in "Apps & features" for uninstalling. |
-| `WoW-Reroll-Hub-portable-0.2.0.exe` | **Portable.** A single file, no installation: drop it anywhere (USB stick included) and double-click. |
+| `WoW-Reroll-Hub-Setup-0.2.1.exe` | **Installer.** Installs for the current user (no admin rights needed), creates a desktop shortcut and a Start menu entry, and registers in "Apps & features" for uninstalling. |
+| `WoW-Reroll-Hub-portable-0.2.1.exe` | **Portable.** A single file, no installation: drop it anywhere (USB stick included) and double-click. |
 
 Both bundle the addon, so exporting works without keeping the project folder around.
 

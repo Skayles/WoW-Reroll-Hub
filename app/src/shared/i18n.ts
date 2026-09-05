@@ -275,6 +275,11 @@ const fr: Dict = {
   'settings.disclaimer':
     "WoW Reroll Hub et l'addon Reroll Helper ont été réalisés avec l'aide d'une IA (Claude), sous direction et relecture humaines. L'addon se contente d'afficher le fichier écrit par cette application : il ne collecte rien dans le jeu et n'envoie rien sur le réseau.",
   'settings.repo': 'Code source et suivi des problèmes',
+  'reports.reimported': '{count} rapport{s} réimporté{s} avec le nouveau parseur.',
+  'settings.reimport': 'Réimporter les rapports',
+  'settings.reimport.desc':
+    "Retélécharge chaque rapport Raidbots enregistré. Utile après une correction du parseur ; les rapports importés en JSON ne peuvent pas l'être.",
+  'settings.reimporting': 'Réimport…',
   'settings.icons': 'Icônes des objets',
   'settings.icons.desc':
     "Récupère les icônes manquantes des objets déjà enregistrés. Lancé automatiquement au démarrage ; ce bouton force un nouveau passage.",
@@ -621,6 +626,11 @@ const en: Dict = {
   'settings.disclaimer':
     'WoW Reroll Hub and the Reroll Helper addon were built with help from an AI assistant (Claude), under human direction and review. The addon only displays the file written by this application: it collects nothing in game and sends nothing over the network.',
   'settings.repo': 'Source code and issue tracker',
+  'reports.reimported': '{count} report{s} re-imported with the new parser.',
+  'settings.reimport': 'Re-import reports',
+  'settings.reimport.desc':
+    'Downloads every stored Raidbots report again. Useful after a parser fix; reports imported from JSON cannot be re-imported.',
+  'settings.reimporting': 'Re-importing…',
   'settings.icons': 'Item icons',
   'settings.icons.desc':
     'Fetches the missing icons of items already stored. Runs automatically at startup; this button forces another pass.',

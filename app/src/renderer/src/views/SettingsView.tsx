@@ -18,6 +18,7 @@ export default function SettingsView({ hub }: { hub: Hub }): JSX.Element {
   const [buildingIndex, setBuildingIndex] = useState(false)
   const [refreshingNames, setRefreshingNames] = useState(false)
   const [fetchingIcons, setFetchingIcons] = useState(false)
+  const [reimporting, setReimporting] = useState(false)
 
   useEffect(() => {
     if (!settings) return
@@ -234,6 +235,27 @@ export default function SettingsView({ hub }: { hub: Hub }): JSX.Element {
         >
           {t('settings.repo')}
         </a>
+      </section>
+
+      <section className="panel">
+        <h2>{t('settings.reimport')}</h2>
+        <p className="faint" style={{ marginTop: 0 }}>
+          {t('settings.reimport.desc')}
+        </p>
+        <button
+          className="btn"
+          disabled={reimporting}
+          onClick={async () => {
+            setReimporting(true)
+            const count = await hub.run(() => window.api.reports.reimportStale(true))
+            if (count !== null) {
+              hub.setBanner({ kind: 'ok', text: t('reports.reimported', { count }) })
+            }
+            setReimporting(false)
+          }}
+        >
+          {reimporting ? t('settings.reimporting') : t('settings.reimport')}
+        </button>
       </section>
 
       <section className="panel">

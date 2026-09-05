@@ -20,6 +20,7 @@ import { syncAll, syncOne } from './sync'
 import { detectInstalls, flavorsIn, normalizeWowRoot } from './wowPath'
 import { exportToAddon, exportToFile, previewExport } from './exporter'
 import {
+  PARSER_VERSION,
   buildReport,
   extractReportId,
   fetchReport,
@@ -70,6 +71,36 @@ function storeReport(report: DroptimizerReport): { replaced: boolean } {
   })
 
   return { replaced }
+}
+
+async function reimportStaleReports(force = false): Promise<number> {
+  const stale = Object.values(store.getData().reports).filter(
+    (report) =>
+      !report.reportId.startsWith('local-') &&
+      (force || report.parserVersion !== PARSER_VERSION)
+  )
+
+  let done = 0
+  for (const report of stale) {
+    try {
+      const raw = await fetchReport(report.reportId)
+      const rebuilt = await buildReport(raw, report.reportId, report.characterId, {
+        category: report.category,
+        difficulty: report.difficulty
+      })
+      storeReport(rebuilt)
+      done++
+    } catch {
+      store.mutate((data) => {
+        const current = data.reports[report.reportId]
+        if (current) current.parserVersion = PARSER_VERSION
+      })
+    }
+  }
+
+  flushItemCache()
+  flushIconCache()
+  return done
 }
 
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
@@ -194,6 +225,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle<number>('report:refreshAll', () => refreshAllReports())
 
   handle<number>('media:backfill', () => backfillIcons())
+
+  handle<number>('report:reimportStale', (force?: boolean) => reimportStaleReports(force))
 
   handle<AppData>('report:remove', (reportId: string) =>
     store.mutate((data) => {

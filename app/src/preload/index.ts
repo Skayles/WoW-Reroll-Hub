@@ -67,6 +67,7 @@ const api = {
       difficulty: RaidDifficulty | null
     ) => call<AppData>('report:recategorize', reportId, category, difficulty),
     refreshAll: () => call<number>('report:refreshAll'),
+    reimportStale: (force?: boolean) => call<number>('report:reimportStale', force),
     onRefreshed: (handler: (count: number) => void) => {
       const listener = (_e: unknown, count: number): void => handler(count)
       ipcRenderer.on('reports:refreshed', listener)

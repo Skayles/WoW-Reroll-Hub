@@ -10,6 +10,8 @@ import { resolveIcon, resolveIcons } from './media'
 import { store as settingsStore } from './store'
 import { t } from './i18n'
 
+export const PARSER_VERSION = 2
+
 const REPORT_ID_RE = /^[A-Za-z0-9_-]{4,40}$/
 
 export function extractReportId(input: string): string | null {
@@ -85,15 +87,26 @@ export async function buildReport(
   const results = raw.sim?.profilesets?.results ?? []
   if (!results.length) throw new Error(t('err.notDroptimizer'))
 
-  const best = new Map<string, { itemId: number | null; rawName: string; dps: number }>()
+  const best = new Map<
+    string,
+    { itemId: number | null; itemLevel: number | null; bonusIds: number[]; rawName: string; dps: number }
+  >()
   for (const result of results) {
     const rawName = result.name ?? ''
     const dps = result.mean ?? 0
     if (!rawName || !dps) continue
-    const itemId = guessItemId(rawName)
-    const key = itemId !== null ? `id:${itemId}` : `name:${rawName}`
+    const parsed = parseProfilesetName(rawName)
+    const key = parsed.itemId !== null ? `id:${parsed.itemId}` : `name:${rawName}`
     const previous = best.get(key)
-    if (!previous || dps > previous.dps) best.set(key, { itemId, rawName, dps })
+    if (!previous || dps > previous.dps) {
+      best.set(key, {
+        itemId: parsed.itemId,
+        itemLevel: parsed.itemLevel,
+        bonusIds: parsed.bonusIds,
+        rawName,
+        dps
+      })
+    }
   }
 
   const unresolved = [...best.values()].filter((e) => e.itemId === null).length
@@ -117,15 +130,15 @@ export async function buildReport(
       itemId: entry.itemId ?? 0,
       itemName: meta?.name || prettifyRawName(entry.rawName),
       iconUrl: null,
+      itemLevel: entry.itemLevel,
+      bonusIds: entry.bonusIds,
       slotGroup: meta?.slotGroup ?? 'OTHER',
       instance: source?.instance ?? null,
       boss: source?.boss ?? null,
       dps: Math.round(entry.dps),
       gain: Math.round(gain),
       gainPct: (gain / baselineDps) * 100,
-      wowheadUrl: entry.itemId
-        ? `https://www.wowhead.com/item=${entry.itemId}`
-        : 'https://www.wowhead.com'
+      wowheadUrl: wowheadItemUrl(entry.itemId ?? 0, entry.itemLevel, entry.bonusIds)
     })
   }
 
@@ -157,6 +170,7 @@ export async function buildReport(
     duration: raw.sim?.options?.max_time ?? null,
     createdAt: raw.simbot?.timestamp ? raw.simbot.timestamp * 1000 : Date.now(),
     importedAt: Date.now(),
+    parserVersion: PARSER_VERSION,
     upgrades,
     notes
   }
@@ -187,6 +201,45 @@ export async function refreshReport(report: DroptimizerReport): Promise<Droptimi
   }
 
   return { ...report, upgrades }
+}
+
+interface ParsedName {
+  itemId: number | null
+  itemLevel: number | null
+  bonusIds: number[]
+}
+
+export function parseProfilesetName(rawName: string): ParsedName {
+  const segments = rawName.split('/')
+  const itemId = Number(segments[3])
+  const itemLevel = Number(segments[4])
+
+  const plausibleId = Number.isInteger(itemId) && itemId >= 10_000 && itemId <= 9_999_999
+  const plausibleLevel = Number.isInteger(itemLevel) && itemLevel > 0 && itemLevel <= 2000
+
+  if (plausibleId && plausibleLevel) {
+    const bonusIds = (segments[5] ?? '')
+      .split(':')
+      .map(Number)
+      .filter((value) => Number.isInteger(value) && value > 0)
+    return { itemId, itemLevel, bonusIds }
+  }
+
+  return { itemId: guessItemId(rawName), itemLevel: null, bonusIds: [] }
+}
+
+export function wowheadItemUrl(
+  itemId: number,
+  itemLevel: number | null,
+  bonusIds: number[]
+): string {
+  if (!itemId) return 'https://www.wowhead.com'
+
+  const params: string[] = []
+  if (bonusIds.length) params.push(`bonus=${bonusIds.join(':')}`)
+  if (itemLevel) params.push(`ilvl=${itemLevel}`)
+
+  return `https://www.wowhead.com/item=${itemId}${params.length ? '?' + params.join('&') : ''}`
 }
 
 function guessItemId(rawName: string): number | null {

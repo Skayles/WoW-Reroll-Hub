@@ -96,6 +96,12 @@ local function BuildFrame()
 	StyleBackdrop(frame, 0.055, 0.067, 0.086, 0.97)
 
 	frame:SetMovable(true)
+	frame:SetResizable(true)
+	if frame.SetResizeBounds then
+		frame:SetResizeBounds(720, 420)
+	elseif frame.SetMinResize then
+		frame:SetMinResize(720, 420)
+	end
 	frame:EnableMouse(true)
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", frame.StartMoving)
@@ -124,7 +130,8 @@ local function BuildFrame()
 
 	local listPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	listPanel:SetPoint("TOPLEFT", 12, -52)
-	listPanel:SetSize(LIST_WIDTH, HEIGHT - 66)
+	listPanel:SetPoint("BOTTOMLEFT", 12, 14)
+	listPanel:SetWidth(LIST_WIDTH)
 	StyleBackdrop(listPanel, 0.08, 0.10, 0.13, 1)
 
 	local L = RH.L
@@ -186,6 +193,30 @@ local function BuildFrame()
 	detail.empty:SetWidth(detail.bodyWidth)
 	detail.empty:SetJustifyH("LEFT")
 	detail.empty:Hide()
+
+	local grip = CreateFrame("Button", nil, frame)
+	grip:SetSize(16, 16)
+	grip:SetPoint("BOTTOMRIGHT", -4, 4)
+	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+	grip:SetScript("OnMouseDown", function()
+		frame:StartSizing("BOTTOMRIGHT")
+	end)
+	grip:SetScript("OnMouseUp", function()
+		frame:StopMovingOrSizing()
+		RH.db.width = math.floor(frame:GetWidth())
+		RH.db.height = math.floor(frame:GetHeight())
+		RH:Refresh()
+	end)
+
+	frame:SetScript("OnSizeChanged", function(self)
+		local available = bodyScroll:GetWidth()
+		if available and available > 40 then
+			bodyChild:SetWidth(available)
+			detail.bodyWidth = available
+		end
+	end)
 
 	frame:Hide()
 end
@@ -272,7 +303,11 @@ local function ItemRowEnter(self)
 		return
 	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetItemByID(self.itemId)
+	if self.itemLink then
+		GameTooltip:SetHyperlink(self.itemLink)
+	else
+		GameTooltip:SetItemByID(self.itemId)
+	end
 	GameTooltip:Show()
 end
 
@@ -370,6 +405,8 @@ local function BuildDetailLines(character)
 				lines[#lines + 1] = {
 					kind = "item",
 					itemId = item.itemId,
+					itemLink = RH:ItemLink(item),
+					ilvl = item.ilvl,
 					name = item.name or "?",
 					source = source,
 					right = ("%s%s%s"):format(COLOR_GREEN, RH:FormatPercent(item.gainPct), R),
@@ -420,13 +457,18 @@ local function BuildDetailLines(character)
 end
 
 local function LayoutBody(lines)
+	local L = RH.L
 	wipe(itemRows)
 	local offset = 0
-	local width = detail.bodyWidth
+	local width = detail.bodyChild:GetWidth()
+	if not width or width < 120 then
+		width = detail.bodyWidth
+	end
 
 	for index, line in ipairs(lines) do
 		local row = bodyRows[index] or CreateBodyRow(index)
 		row.itemId = nil
+		row.itemLink = nil
 		row.icon:Hide()
 		row.sub:Hide()
 		row.right:SetText("")
@@ -449,7 +491,11 @@ local function LayoutBody(lines)
 			row.text:ClearAllPoints()
 			row.text:SetPoint("TOPLEFT", 26, -2)
 			row.text:SetWidth(width - 26 - 95)
-			row.text:SetText(line.name)
+			row.text:SetText(
+				line.ilvl and line.ilvl > 0
+					and ("%s  %s%s%s"):format(line.name, COLOR_FAINT, L.ilvlShort:format(line.ilvl), R)
+					or line.name
+			)
 
 			row.sub:Show()
 			row.sub:ClearAllPoints()
@@ -460,6 +506,7 @@ local function LayoutBody(lines)
 			row.right:SetText(line.rightSub and (line.right .. "\n" .. line.rightSub) or line.right)
 
 			row.itemId = line.itemId
+			row.itemLink = line.itemLink
 			row:EnableMouse(true)
 			itemRows[#itemRows + 1] = row
 			height = 33
@@ -635,6 +682,10 @@ function RH:Toggle()
 	if frame:IsShown() then
 		frame:Hide()
 		return
+	end
+
+	if self.db and self.db.width and self.db.height then
+		frame:SetSize(self.db.width, self.db.height)
 	end
 
 	local point = self.db and self.db.point
