@@ -3,6 +3,7 @@ import path from 'node:path'
 import { store } from './store'
 import { registerIpc } from './ipc'
 import { flushItemCache } from './raidbots'
+import { flushIconCache } from './media'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -73,7 +74,11 @@ if (!app.requestSingleInstanceLock()) {
 
 app.on('window-all-closed', () => {
   flushItemCache()
+  flushIconCache()
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => flushItemCache())
+app.on('before-quit', () => {
+  flushItemCache()
+  flushIconCache()
+})

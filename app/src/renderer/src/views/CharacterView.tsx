@@ -126,6 +126,7 @@ export default function CharacterView({ hub, character }: Props): JSX.Element {
             {gear.map((item) => (
               <div className="gear-row" key={item.slot}>
                 <div className="slot">{t(`slot.${item.slot}`)}</div>
+                <ItemIcon url={item.iconUrl} quality={item.quality} />
                 <div>
                   <div
                     className="item-name"
@@ -284,6 +285,21 @@ export default function CharacterView({ hub, character }: Props): JSX.Element {
         </p>
       )}
     </div>
+  )
+}
+
+export function ItemIcon({
+  url,
+  quality
+}: {
+  url: string | null
+  quality?: string
+}): JSX.Element {
+  const border = quality ? qualityColor(quality) : 'var(--border-strong)'
+  return url ? (
+    <img className="item-icon" src={url} alt="" style={{ borderColor: border }} />
+  ) : (
+    <span className="item-icon empty" style={{ borderColor: border }} />
   )
 }
 

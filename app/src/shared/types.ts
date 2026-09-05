@@ -63,6 +63,7 @@ export interface GearItem {
   itemId: number
   name: string
   itemLevel: number
+  iconUrl: string | null
 
   quality: string
   enchantment: string | null
@@ -128,6 +129,7 @@ export interface CharacterDetail extends CharacterRef {
 export interface DroptimizerUpgrade {
   itemId: number
   itemName: string
+  iconUrl: string | null
 
   slotGroup: SlotGroup
 

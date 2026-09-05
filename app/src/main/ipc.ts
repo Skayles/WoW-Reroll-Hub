@@ -14,6 +14,7 @@ import { contentKey, type ContentCategory, type RaidDifficulty } from '@shared/c
 import { store } from './store'
 import { t } from './i18n'
 import { ensureIndex, journalStatus } from './journal'
+import { flushIconCache } from './media'
 import { authorize, clearToken, getToken, redirectUri } from './oauth'
 import { syncAll, syncOne } from './sync'
 import { detectInstalls, flavorsIn, normalizeWowRoot } from './wowPath'
@@ -46,6 +47,7 @@ async function refreshAllReports(): Promise<number> {
     })
   }
   flushItemCache()
+  flushIconCache()
   return reports.length
 }
 
@@ -111,6 +113,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle<SyncResult>('sync:all', async () => {
     const result = await syncAll(getWindow())
     flushItemCache()
+    flushIconCache()
     if (result.ok && store.getSettings().autoExport && store.getSettings().wowPath) {
       const exported = exportToAddon()
       getWindow()?.webContents.send('export:auto', exported)
@@ -165,6 +168,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       const raw = await fetchReport(reportId)
       const report = await buildReport(raw, reportId, characterId, forced)
       flushItemCache()
+      flushIconCache()
       storeReport(report)
       return report
     }
@@ -181,6 +185,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       const reportId = `local-${Date.now().toString(36)}`
       const report = await buildReport(raw, reportId, characterId, forced)
       flushItemCache()
+      flushIconCache()
       storeReport(report)
       return report
     }

@@ -464,9 +464,24 @@ a:hover {
   gap: 2px;
 }
 
+.item-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  display: block;
+  object-fit: cover;
+  background: var(--bg);
+  flex: none;
+}
+
+.item-icon.empty {
+  background: var(--bg-raised);
+}
+
 .gear-row {
   display: grid;
-  grid-template-columns: 88px 1fr auto;
+  grid-template-columns: 88px 26px 1fr auto;
   gap: 10px;
   align-items: center;
   padding: 6px 8px;
@@ -681,7 +696,7 @@ a:hover {
 
 .upgrade-row {
   display: grid;
-  grid-template-columns: 1fr 96px;
+  grid-template-columns: 26px 1fr 96px;
   gap: 10px;
   align-items: center;
   padding: 6px 8px;

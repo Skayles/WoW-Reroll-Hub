@@ -6,6 +6,7 @@ import { groupForInventoryType, type SlotGroup } from '@shared/slots'
 import { detectContent, type ContentCategory, type RaidDifficulty } from '@shared/content'
 import { apiGet, localized } from './blizzard'
 import { ensureIndex, lookup } from './journal'
+import { resolveIcon, resolveIcons } from './media'
 import { store as settingsStore } from './store'
 import { t } from './i18n'
 
@@ -115,6 +116,7 @@ export async function buildReport(
     upgrades.push({
       itemId: entry.itemId ?? 0,
       itemName: meta?.name || prettifyRawName(entry.rawName),
+      iconUrl: null,
       slotGroup: meta?.slotGroup ?? 'OTHER',
       instance: source?.instance ?? null,
       boss: source?.boss ?? null,
@@ -128,6 +130,14 @@ export async function buildReport(
   }
 
   if (unknownSources) notes.push(t('note.unknownSources', { count: unknownSources }))
+
+  await resolveIcons(
+    upgrades,
+    (upgrade) => upgrade.itemId,
+    (upgrade, url) => {
+      upgrade.iconUrl = url
+    }
+  )
 
   upgrades.sort((a, b) => b.gainPct - a.gainPct)
 
@@ -169,6 +179,7 @@ export async function refreshReport(report: DroptimizerReport): Promise<Droptimi
     upgrades.push({
       ...upgrade,
       itemName: meta?.name || upgrade.itemName,
+      iconUrl: upgrade.iconUrl ?? (await resolveIcon(upgrade.itemId)),
       slotGroup: meta?.slotGroup ?? upgrade.slotGroup,
       instance: source?.instance ?? upgrade.instance,
       boss: source?.boss ?? upgrade.boss

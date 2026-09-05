@@ -12,6 +12,8 @@ local COLOR_ORANGE = "|cfff0a35e"
 local R = "|r"
 
 local frame, listChild, detail, rows, sortButtons, contentButtons
+local bodyRows, itemRows = {}, {}
+local FALLBACK_ICON = 134400
 
 local function StyleBackdrop(target, r, g, b, a)
 	target:SetBackdrop({
@@ -176,13 +178,14 @@ local function BuildFrame()
 	bodyChild:SetSize(WIDTH - LIST_WIDTH - 70, 10)
 	bodyScroll:SetScrollChild(bodyChild)
 
-	detail.body = bodyChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	detail.body:SetPoint("TOPLEFT")
-	detail.body:SetWidth(WIDTH - LIST_WIDTH - 70)
-	detail.body:SetJustifyH("LEFT")
-	detail.body:SetJustifyV("TOP")
-	detail.body:SetSpacing(3)
 	detail.bodyChild = bodyChild
+	detail.bodyWidth = WIDTH - LIST_WIDTH - 70
+
+	detail.empty = bodyChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	detail.empty:SetPoint("TOPLEFT")
+	detail.empty:SetWidth(detail.bodyWidth)
+	detail.empty:SetJustifyH("LEFT")
+	detail.empty:Hide()
 
 	frame:Hide()
 end
@@ -253,19 +256,76 @@ local function FindCharacter(id)
 	return nil
 end
 
-local function BuildDetailText(character)
+local function ItemIcon(itemId)
+	if not itemId or itemId == 0 then
+		return FALLBACK_ICON
+	end
+	local icon = C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemId)
+	if not icon and GetItemIcon then
+		icon = GetItemIcon(itemId)
+	end
+	return icon or FALLBACK_ICON
+end
+
+local function ItemRowEnter(self)
+	if not self.itemId or self.itemId == 0 then
+		return
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetItemByID(self.itemId)
+	GameTooltip:Show()
+end
+
+local function ItemRowLeave()
+	GameTooltip:Hide()
+end
+
+local function CreateBodyRow(index)
+	local row = CreateFrame("Button", nil, detail.bodyChild)
+
+	row.icon = row:CreateTexture(nil, "ARTWORK")
+	row.icon:SetPoint("TOPLEFT", 0, -1)
+	row.icon:SetSize(20, 20)
+	row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+	row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.text:SetJustifyH("LEFT")
+	row.text:SetJustifyV("TOP")
+
+	row.right = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.right:SetPoint("TOPRIGHT", 0, -3)
+	row.right:SetJustifyH("RIGHT")
+
+	row.sub = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	row.sub:SetJustifyH("LEFT")
+
+	row:SetScript("OnEnter", ItemRowEnter)
+	row:SetScript("OnLeave", ItemRowLeave)
+
+	bodyRows[index] = row
+	return row
+end
+
+local function BuildDetailLines(character)
 	local L = RH.L
 	local lines = {}
-	local function add(text)
-		lines[#lines + 1] = text or ""
+
+	local function header(value)
+		lines[#lines + 1] = { kind = "header", text = value }
+	end
+	local function text(value, color)
+		lines[#lines + 1] = { kind = "text", text = value, color = color }
+	end
+	local function blank()
+		lines[#lines + 1] = { kind = "blank" }
 	end
 
-	add(COLOR_ACCENT .. L.focusHeader .. R)
+	header(L.focusHeader)
 	if character.contents and #character.contents > 0 then
 		for index, content in ipairs(character.contents) do
-			local prefix = index == 1 and (COLOR_GREEN .. "→ " .. R) or "   "
+			local prefix = index == 1 and (COLOR_GREEN .. "> " .. R) or "   "
 			local avgGain = RH:FormatGain(content.top3AvgGain)
-			add(("%s%s  %s%s%s%s  %s%s%s"):format(
+			text(("%s%s  %s%s%s%s  %s%s%s"):format(
 				prefix,
 				RH:ContentName(content.category, content.difficulty),
 				COLOR_GREEN,
@@ -278,88 +338,152 @@ local function BuildDetailText(character)
 			))
 		end
 	else
-		add(COLOR_FAINT .. L.focusNone .. R)
+		text(L.focusNone, COLOR_FAINT)
 	end
-	add("")
+	blank()
 
 	local slots = RH:GetSlotsForTab(character, RH.db.contentTab)
 	if slots and #slots > 0 then
-		add(COLOR_ACCENT .. L.bySlotHeader .. R)
+		header(L.bySlotHeader)
 		for _, slot in ipairs(slots) do
 			local extra = ""
 			if slot.candidates and slot.candidates > #slot.items then
 				extra = ("  %s%s%s"):format(COLOR_FAINT, L.bySlotMore:format(slot.candidates), R)
 			end
-			add(("  %s%s%s%s"):format(COLOR_DIM, RH:GroupName(slot.slot), R, extra))
+			text(("%s%s%s%s"):format(COLOR_DIM, RH:GroupName(slot.slot), R, extra))
 
 			for _, item in ipairs(slot.items or {}) do
 				local source
 				if item.boss and item.boss ~= "" then
-					source = item.instance ~= "" and (item.boss .. " — " .. item.instance) or item.boss
+					source = item.instance ~= "" and (item.boss .. " - " .. item.instance) or item.boss
 				elseif item.instance and item.instance ~= "" then
 					source = item.instance
 				else
 					source = L.sourceUnknown
 				end
 
-				local gain = RH:FormatGain(item.gain)
-				add(("      %s  %s%s%s%s"):format(
-					item.name or "?",
-					COLOR_GREEN,
-					RH:FormatPercent(item.gainPct),
-					gain and (" (" .. gain .. ")") or "",
-					R
-				))
 				if RH.db.contentTab == "TOTAL" then
-					local origin = RH:ContentName(item.category, item.difficulty)
-					add(("         %s%s · %s%s"):format(COLOR_FAINT, source, origin, R))
-				else
-					add(("         %s%s%s"):format(COLOR_FAINT, source, R))
+					source = source .. "  |  " .. RH:ContentName(item.category, item.difficulty)
 				end
+
+				local gain = RH:FormatGain(item.gain)
+				lines[#lines + 1] = {
+					kind = "item",
+					itemId = item.itemId,
+					name = item.name or "?",
+					source = source,
+					right = ("%s%s%s"):format(COLOR_GREEN, RH:FormatPercent(item.gainPct), R),
+					rightSub = gain and (COLOR_FAINT .. gain .. R) or nil,
+				}
 			end
 		end
-		add("")
+		blank()
 	end
 
 	if character.issues and #character.issues > 0 then
-		add(COLOR_ACCENT .. L.issuesHeader .. R)
+		header(L.issuesHeader)
 		for _, issue in ipairs(character.issues) do
-			add(COLOR_ORANGE .. "  • " .. RH:IssueText(issue) .. R)
+			text("  " .. RH:IssueText(issue), COLOR_ORANGE)
 		end
-		add("")
+		blank()
 	end
 
 	if character.weakSlots and #character.weakSlots > 0 then
-		add(COLOR_ACCENT .. L.weakHeader .. R)
+		header(L.weakHeader)
 		local parts = {}
 		for _, weak in ipairs(character.weakSlots) do
 			parts[#parts + 1] = ("%s (%d)"):format(RH:SlotName(weak.slot), weak.ilvl or 0)
 		end
-		add(COLOR_DIM .. "  " .. table.concat(parts, ", ") .. R)
-		add("")
+		text("  " .. table.concat(parts, ", "), COLOR_DIM)
+		blank()
 	end
 
 	if character.raids and #character.raids > 0 then
-		add(COLOR_ACCENT .. L.raidHeader .. R)
+		header(L.raidHeader)
 		for _, raid in ipairs(character.raids) do
-			add(("  %s%s — %s : %d/%d%s"):format(
-				COLOR_DIM,
+			text(("  %s - %s : %d/%d"):format(
 				raid.raid or "?",
 				raid.difficulty or "?",
 				raid.killed or 0,
-				raid.total or 0,
-				R
-			))
+				raid.total or 0
+			), COLOR_DIM)
 		end
-		add("")
+		blank()
 	end
 
 	if character.note and character.note ~= "" then
-		add(COLOR_ACCENT .. L.noteHeader .. R)
-		add(COLOR_DIM .. "  " .. character.note .. R)
+		header(L.noteHeader)
+		text("  " .. character.note, COLOR_DIM)
 	end
 
-	return table.concat(lines, "\n")
+	return lines
+end
+
+local function LayoutBody(lines)
+	wipe(itemRows)
+	local offset = 0
+	local width = detail.bodyWidth
+
+	for index, line in ipairs(lines) do
+		local row = bodyRows[index] or CreateBodyRow(index)
+		row.itemId = nil
+		row.icon:Hide()
+		row.sub:Hide()
+		row.right:SetText("")
+		row:EnableMouse(false)
+
+		local height
+		if line.kind == "blank" then
+			row.text:SetText("")
+			height = 8
+		elseif line.kind == "header" then
+			row.text:ClearAllPoints()
+			row.text:SetPoint("TOPLEFT", 0, -5)
+			row.text:SetWidth(width)
+			row.text:SetText(COLOR_ACCENT .. line.text .. R)
+			height = 23
+		elseif line.kind == "item" then
+			row.icon:Show()
+			row.icon:SetTexture(ItemIcon(line.itemId))
+
+			row.text:ClearAllPoints()
+			row.text:SetPoint("TOPLEFT", 26, -2)
+			row.text:SetWidth(width - 26 - 95)
+			row.text:SetText(line.name)
+
+			row.sub:Show()
+			row.sub:ClearAllPoints()
+			row.sub:SetPoint("TOPLEFT", 26, -16)
+			row.sub:SetWidth(width - 26 - 95)
+			row.sub:SetText(COLOR_FAINT .. line.source .. R)
+
+			row.right:SetText(line.rightSub and (line.right .. "\n" .. line.rightSub) or line.right)
+
+			row.itemId = line.itemId
+			row:EnableMouse(true)
+			itemRows[#itemRows + 1] = row
+			height = 33
+		else
+			row.text:ClearAllPoints()
+			row.text:SetPoint("TOPLEFT", 0, 0)
+			row.text:SetWidth(width)
+			row.text:SetText((line.color or "") .. line.text .. ((line.color and R) or ""))
+			height = math.max(row.text:GetStringHeight() + 3, 15)
+		end
+
+		row:SetHeight(height)
+		row:ClearAllPoints()
+		row:SetPoint("TOPLEFT", detail.bodyChild, "TOPLEFT", 0, -offset)
+		row:SetPoint("TOPRIGHT", detail.bodyChild, "TOPRIGHT", 0, -offset)
+		row:Show()
+		offset = offset + height
+	end
+
+	for index = #lines + 1, #bodyRows do
+		bodyRows[index]:Hide()
+	end
+
+	detail.bodyChild:SetHeight(math.max(offset, 40))
 end
 
 local function CreateContentButton(index)
@@ -430,7 +554,12 @@ local function RenderDetail()
 		detail.name:SetText("")
 		detail.meta:SetText("")
 		detail.kpi:SetText("")
-		detail.body:SetText(COLOR_FAINT .. RH.L.pickCharacter .. R)
+		for _, row in ipairs(bodyRows) do
+			row:Hide()
+		end
+		wipe(itemRows)
+		detail.empty:SetText(COLOR_FAINT .. RH.L.pickCharacter .. R)
+		detail.empty:Show()
 		detail.bodyChild:SetHeight(40)
 		return
 	end
@@ -461,10 +590,8 @@ local function RenderDetail()
 		COLOR_FAINT, R, character.level or 0
 	))
 
-	local text = BuildDetailText(character)
-	detail.body:SetText(text)
-
-	detail.bodyChild:SetHeight(math.max(detail.body:GetStringHeight() + 10, 40))
+	detail.empty:Hide()
+	LayoutBody(BuildDetailLines(character))
 end
 
 function RH:Refresh()
@@ -489,6 +616,16 @@ function RH:Refresh()
 	RenderList()
 	RenderDetail()
 end
+
+local itemWatcher = CreateFrame("Frame")
+itemWatcher:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+itemWatcher:SetScript("OnEvent", function(_, _, itemId)
+	for _, row in ipairs(itemRows) do
+		if row.itemId == itemId then
+			row.icon:SetTexture(ItemIcon(itemId))
+		end
+	end
+end)
 
 function RH:Toggle()
 	if not frame then

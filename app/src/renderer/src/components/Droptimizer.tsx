@@ -18,6 +18,7 @@ import {
 } from '@shared/content'
 import { computeBySlot, reportsFor, type ContentScope } from '@shared/focus'
 import type { Hub } from '../state'
+import { ItemIcon } from '../views/CharacterView'
 
 interface Props {
   hub: Hub
@@ -304,6 +305,7 @@ function UpgradeRow({
 
   return (
     <div className="upgrade-row">
+      <ItemIcon url={upgrade.iconUrl} />
       <div>
         <a onClick={() => void window.api.system.openExternal(upgrade.wowheadUrl)}>
           {upgrade.itemName}

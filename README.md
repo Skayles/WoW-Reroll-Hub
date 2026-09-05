@@ -44,8 +44,8 @@ Two files land in `app/release/`:
 
 | File | Use |
 | --- | --- |
-| `WoW-Reroll-Hub-Setup-0.1.0.exe` | **Installer.** Installs for the current user (no admin rights needed), creates a desktop shortcut and a Start menu entry, and registers in "Apps & features" for uninstalling. |
-| `WoW-Reroll-Hub-portable-0.1.0.exe` | **Portable.** A single file, no installation: drop it anywhere (USB stick included) and double-click. |
+| `WoW-Reroll-Hub-Setup-0.2.0.exe` | **Installer.** Installs for the current user (no admin rights needed), creates a desktop shortcut and a Start menu entry, and registers in "Apps & features" for uninstalling. |
+| `WoW-Reroll-Hub-portable-0.2.0.exe` | **Portable.** A single file, no installation: drop it anywhere (USB stick included) and double-click. |
 
 Both bundle the addon, so exporting works without keeping the project folder around.
 
@@ -121,7 +121,7 @@ The **All items** view keeps the full list, report by report.
 
 ### Where each item drops
 
-Every upgrade shows its gain both as a **percentage and in absolute dps**, along with the **boss and dungeon/raid** it drops from. The percentage stays the primary reading — it is what compares across characters — while the dps gives the real magnitude.
+Every item shows its **icon**, its gain both as a **percentage and in absolute dps**, and the **boss and dungeon/raid** it drops from. Icons come from Blizzard's item media endpoint and are cached locally, so only items you have never seen before cost a request. The percentage stays the primary reading — it is what compares across characters — while the dps gives the real magnitude.
 
 Boss data comes from Blizzard's adventure journal (`/data/wow/journal-*`), the only official source linking an item id to its encounter. The index is built automatically on the first import and cached, covering the last two expansions. If sources are missing, use *Settings → Loot index → Rebuild index*.
 
@@ -149,7 +149,7 @@ Automatic export after each sync is on by default (can be turned off in Settings
 
 The window lists every character (sortable by ilvl, M+ score, focus, name) and, for the selected one, shows: the content ranking, missing enchants and empty sockets, lagging slots, raid progress and your note.
 
-The detail panel carries the same **content tabs** as the app — Total plus one tab per content the character has a report for. Switching tabs swaps the best-piece-per-slot list, so you can check what Heroic raid gives you separately from Mythic+. On Total, each item also shows which content it comes from.
+Items are listed with their in-game **icon**, and hovering one shows the real **item tooltip**. The detail panel carries the same **content tabs** as the app — Total plus one tab per content the character has a report for. Switching tabs swaps the best-piece-per-slot list, so you can check what Heroic raid gives you separately from Mythic+. On Total, each item also shows which content it comes from.
 
 ---
 

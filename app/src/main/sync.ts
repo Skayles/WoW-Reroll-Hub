@@ -14,6 +14,7 @@ import { ENCHANTABLE_SLOTS } from '@shared/constants'
 import { t } from './i18n'
 import { apiGet, getAccountProfile, localized, type AccountCharacter } from './blizzard'
 import { store } from './store'
+import { resolveIcons } from './media'
 
 const TANK_SPECS = new Set([250, 581, 104, 268, 66, 73])
 const HEALER_SPECS = new Set([105, 270, 65, 256, 257, 264, 1468])
@@ -239,6 +240,13 @@ async function fetchCharacter(
   ])
 
   const gear = parseGear(equipment)
+  await resolveIcons(
+    gear,
+    (item) => item.itemId,
+    (item, url) => {
+      item.iconUrl = url
+    }
+  )
 
   return {
     id: characterId(region, realmSlug, char.name),
@@ -300,6 +308,7 @@ function parseGear(equipment: EquipmentResponse | null): GearItem[] {
       itemId: item.item.id,
       name: localized(item.name),
       itemLevel: item.level?.value ?? 0,
+      iconUrl: null,
       quality: item.quality.type,
       enchantment: enchantments.length ? localized(enchantments[0].display_string) : null,
       sockets: sockets.length,
