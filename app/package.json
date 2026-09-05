@@ -1,6 +1,6 @@
 {
   "name": "wow-reroll-hub",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Hub multi-personnages WoW : recap stuff/stats via Battle.net, integration Droptimizer (Raidbots) et export vers l'addon RerollHelper.",
   "main": "./out/main/index.js",
   "author": "Skayles",

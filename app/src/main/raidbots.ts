@@ -10,7 +10,7 @@ import { resolveIcon, resolveIcons } from './media'
 import { store as settingsStore } from './store'
 import { t } from './i18n'
 
-export const PARSER_VERSION = 3
+export const PARSER_VERSION = 4
 
 const REPORT_ID_RE = /^[A-Za-z0-9_-]{4,40}$/
 
@@ -32,6 +32,19 @@ export function extractReportId(input: string): string | null {
   }
 }
 
+interface LibraryItem {
+  id: number
+  name?: string
+  itemLevel?: number
+  baseItemLevel?: number
+  bonus_id?: string
+  enchant_id?: number
+  gem_id?: string
+  inventoryType?: number
+  instance?: { name?: string }
+  encounter?: { name?: string }
+}
+
 interface RawSim {
   sim?: {
     players?: { collected_data?: { dps?: { mean?: number } } }[]
@@ -42,7 +55,10 @@ interface RawSim {
     title?: string
     type?: string
     timestamp?: number
-    meta?: { rawFormData?: Record<string, unknown> }
+    meta?: {
+      rawFormData?: Record<string, unknown>
+      itemLibrary?: LibraryItem[]
+    }
   }
 }
 
@@ -120,35 +136,62 @@ export async function buildReport(
   const unresolved = [...best.values()].filter((e) => e.itemId === null).length
   if (unresolved) notes.push(t('note.unresolvedItems', { count: unresolved }))
 
-  try {
-    await ensureIndex()
-  } catch {
-  }
+  const library = readLibrary(raw)
 
+  const needsIndex = [...best.values()].some(
+    (entry) => entry.itemId === null || !library.get(entry.itemId)?.instance?.name
+  )
+  if (needsIndex) {
+    try {
+      await ensureIndex()
+    } catch {
+    }
+  }
   const upgrades: DroptimizerUpgrade[] = []
   let unknownSources = 0
 
   for (const entry of best.values()) {
     const gain = entry.dps - baselineDps
-    const meta = entry.itemId !== null ? await resolveItem(entry.itemId) : null
-    const source =
-      (await resolveEncounter(entry.encounterId ?? 0)) ??
-      (entry.itemId !== null ? lookup(entry.itemId) : null)
-    if (!source) unknownSources++
+    const known = entry.itemId !== null ? library.get(entry.itemId) : undefined
+
+    const bonusIds = known?.bonus_id ? splitIds(known.bonus_id) : entry.bonusIds
+    const itemLevel = known?.itemLevel ?? entry.itemLevel
+    const enchantId = known?.enchant_id ?? 0
+    const gemIds = splitIds(known?.gem_id)
+
+    let instance = known?.instance?.name ?? null
+    let boss = known?.encounter?.name ?? null
+
+    if (!instance && !boss) {
+      const source =
+        (await resolveEncounter(entry.encounterId ?? 0)) ??
+        (entry.itemId !== null ? lookup(entry.itemId) : null)
+      instance = source?.instance ?? null
+      boss = source?.boss ?? null
+    }
+    if (!instance && !boss) unknownSources++
+
+    const meta = known?.name
+      ? null
+      : entry.itemId !== null
+        ? await resolveItem(entry.itemId)
+        : null
 
     upgrades.push({
       itemId: entry.itemId ?? 0,
-      itemName: meta?.name || prettifyRawName(entry.rawName),
+      itemName: known?.name || meta?.name || prettifyRawName(entry.rawName),
       iconUrl: null,
-      itemLevel: entry.itemLevel,
-      bonusIds: entry.bonusIds,
-      slotGroup: meta?.slotGroup ?? 'OTHER',
-      instance: source?.instance ?? null,
-      boss: source?.boss ?? null,
+      itemLevel,
+      bonusIds,
+      enchantId,
+      gemIds,
+      slotGroup: meta?.slotGroup ?? (await slotFor(entry.itemId, known)),
+      instance,
+      boss,
       dps: Math.round(entry.dps),
       gain: Math.round(gain),
       gainPct: (gain / baselineDps) * 100,
-      wowheadUrl: wowheadItemUrl(entry.itemId ?? 0, entry.itemLevel, entry.bonusIds)
+      wowheadUrl: wowheadItemUrl(entry.itemId ?? 0, itemLevel, bonusIds)
     })
   }
 
@@ -202,7 +245,7 @@ export async function refreshReport(report: DroptimizerReport): Promise<Droptimi
     const source = lookup(upgrade.itemId)
     upgrades.push({
       ...upgrade,
-      itemName: meta?.name || upgrade.itemName,
+      itemName: upgrade.itemName || meta?.name || '',
       iconUrl: upgrade.iconUrl ?? (await resolveIcon(upgrade.itemId)),
       slotGroup: meta?.slotGroup ?? upgrade.slotGroup,
       instance: source?.instance ?? upgrade.instance,
@@ -243,6 +286,37 @@ export function parseProfilesetName(rawName: string): ParsedName {
   }
 
   return { itemId: guessItemId(rawName), itemLevel: null, bonusIds: [], encounterId: null }
+}
+
+function splitIds(value: string | undefined | null): number[] {
+  if (!value) return []
+  return value
+    .split('/')
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0)
+}
+
+/**
+ * Le rapport embarque sa propre bibliotheque d'objets : niveau reel, bonus ids
+ * qui portent ce niveau, enchantement, gemmes, instance et rencontre. C'est la
+ * source la plus fiable, et elle evite autant d'appels a l'API Blizzard.
+ */
+function readLibrary(raw: RawSim): Map<number, LibraryItem> {
+  const library = new Map<number, LibraryItem>()
+  for (const entry of raw.simbot?.meta?.itemLibrary ?? []) {
+    if (entry?.id) library.set(entry.id, entry)
+  }
+  return library
+}
+
+async function slotFor(
+  itemId: number | null,
+  known: LibraryItem | undefined
+): Promise<DroptimizerUpgrade['slotGroup']> {
+  if (itemId === null) return 'OTHER'
+  const meta = await resolveItem(itemId)
+  if (meta) return meta.slotGroup
+  return known ? 'OTHER' : 'OTHER'
 }
 
 export function wowheadItemUrl(

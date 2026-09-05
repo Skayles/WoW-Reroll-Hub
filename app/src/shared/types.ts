@@ -2,7 +2,7 @@ import type { Lang } from './i18n'
 import type { SlotGroup } from './slots'
 import type { ContentCategory, RaidDifficulty } from './content'
 
-export const EXPORT_SCHEMA_VERSION = 5
+export const EXPORT_SCHEMA_VERSION = 6
 
 export type Region = 'eu' | 'us' | 'kr' | 'tw'
 
@@ -133,6 +133,8 @@ export interface DroptimizerUpgrade {
   iconUrl: string | null
   itemLevel: number | null
   bonusIds: number[]
+  enchantId: number
+  gemIds: number[]
 
   slotGroup: SlotGroup
 

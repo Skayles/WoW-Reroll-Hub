@@ -1,7 +1,7 @@
 local ADDON_NAME, RH = ...
 _G.RerollHelper = RH
 
-RH.SCHEMA = 5
+RH.SCHEMA = 6
 RH.VERSION = C_AddOns and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "0.1.0"
 
 function RH:GetExport()
@@ -126,12 +126,24 @@ function RH:ItemLink(item)
 		return nil
 	end
 
+	local gems = item.gems or {}
 	local bonus = item.bonus or {}
-	local parts = { "item:" .. item.itemId }
-	for _ = 1, 11 do
-		parts[#parts + 1] = "0"
-	end
-	parts[#parts + 1] = tostring(#bonus)
+
+	local parts = {
+		"item:" .. item.itemId,
+		tostring(item.enchant or 0),
+		tostring(gems[1] or 0),
+		tostring(gems[2] or 0),
+		tostring(gems[3] or 0),
+		tostring(gems[4] or 0),
+		"0",
+		"0",
+		"0",
+		"0",
+		"0",
+		"0",
+		tostring(#bonus),
+	}
 	for _, id in ipairs(bonus) do
 		parts[#parts + 1] = tostring(id)
 	end
